@@ -1,26 +1,35 @@
 import React, { useState } from "react";
+import { Container, Typography, Box, Button, TextField, MenuItem, Paper } from "@mui/material";
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
+import ReportList from "./ReportList";
 
 export default function App() {
-  const [currentPosition, setCurrentPosition] = useState([43.4923, -1.4746]);
   const [reports, setReports] = useState([]);
 
   const handleNewReport = (report) => {
-    console.log("Report reçu:", report);
     setReports([...reports, report]);
   };
 
   return (
-    <div className="App" style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-      <h1>Solid Auto</h1>
-      <MapView reports={reports} onPositionChange={setCurrentPosition} />
-      <ReportForm onSubmit={handleNewReport} position={currentPosition} />
-      {/* Tu peux aussi afficher la liste des reports ici si tu veux */}
-    </div>
+    <Container maxWidth="md" sx={{ pt: 3 }}>
+      <Typography variant="h4" gutterBottom color="primary">
+        Solid Auto
+      </Typography>
+      <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+        <ReportForm onSubmit={handleNewReport} />
+      </Paper>
+
+      <Box sx={{ height: 400, mb: 3 }}>
+        <MapView reports={reports} />
+      </Box>
+
+      <Paper elevation={3} sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Pannes signalées
+        </Typography>
+        <ReportList reports={reports} />
+      </Paper>
+    </Container>
   );
 }
-
-
-
-

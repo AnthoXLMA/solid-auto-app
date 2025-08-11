@@ -12,9 +12,24 @@ code {
     monospace;
 }
 
+.map-and-report-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;  /* espace vertical entre la carte et le texte */
+  max-width: 600px;
+  margin: auto;
+  padding: 20px;
+}
 
-/* Leaflet CSS obligatoire pour afficher la carte */
 .leaflet-container {
-  height: 100vh; /* adapte la hauteur comme tu veux */
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
+  /* hauteur et largeur déjà dans style inline ou ici si tu préfères */
+  height: 500px;
   width: 100%;
+}
+
+.report-text {
+  font-size: 1.2rem;
+  color: #333;
 }
