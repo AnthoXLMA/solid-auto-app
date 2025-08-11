@@ -11,3 +11,10 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+
+/* Leaflet CSS obligatoire pour afficher la carte */
+.leaflet-container {
+  height: 100vh; /* adapte la hauteur comme tu veux */
+  width: 100%;
+}
