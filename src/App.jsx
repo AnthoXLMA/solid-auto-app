@@ -3,6 +3,7 @@ import { Container, Typography, Box, Button, TextField, MenuItem, Paper } from "
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
 import ReportList from "./ReportList";
+import Auth from "./Auth";
 
 export default function App() {
   const [reports, setReports] = useState([]);
@@ -13,6 +14,7 @@ export default function App() {
 
   return (
     <Container maxWidth="md" sx={{ pt: 3 }}>
+    <Auth />
       <Typography variant="h4" gutterBottom color="primary">
         Solid Auto
       </Typography>
