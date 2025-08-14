@@ -1,37 +1,48 @@
 import React, { useState } from "react";
-import { Container, Typography, Box, Button, TextField, MenuItem, Paper } from "@mui/material";
-import MapView from "./MapView";
-import ReportForm from "./ReportForm";
-import ReportList from "./ReportList";
 import Auth from "./Auth";
+import MapView from "./MapView";
+import ReportForm from "./ReportForm"
 
 export default function App() {
-  const [reports, setReports] = useState([]);
+  const [user, setUser] = useState(null);
+  const [currentPosition, setCurrentPosition] = useState([43.4923, -1.4746]); // Bayonne par défaut
+  const [reports, setReports] = useState([
+    {
+      latitude: 43.4925,
+      longitude: -1.4740,
+      nature: "batterie",
+      message: "Plus de batterie, cherche des pinces",
+      status: "en-attente",
+      address: "Rue des Fleurs, Bayonne",
+    },
+  ]);
+  const [solidaires, setSolidaires] = useState([]);
 
-  const handleNewReport = (report) => {
-    setReports([...reports, report]);
-  };
+    const handleAddSolidaire = (solidaire) => {
+      setSolidaires([...solidaires, solidaire]);
+    };
 
   return (
-    <Container maxWidth="md" sx={{ pt: 3 }}>
-    <Auth />
-      <Typography variant="h4" gutterBottom color="primary">
-        Solid Auto
-      </Typography>
-      <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-        <ReportForm onSubmit={handleNewReport} />
-      </Paper>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
+      {!user ? (
+        <Auth setUser={setUser} onBecomeSolidaire={handleAddSolidaire} />
+      ) : (
+        <>
+          <h2>Bienvenue {user.email}</h2>
 
-      <Box sx={{ height: 400, mb: 3 }}>
-        <MapView reports={reports} />
-      </Box>
+          <MapView
+            reports={reports}
+            solidaires={solidaires}
+            userPosition={currentPosition}
+            onPositionChange={setCurrentPosition}
+          />
 
-      <Paper elevation={3} sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Pannes signalées
-        </Typography>
-        <ReportList reports={reports} />
-      </Paper>
-    </Container>
+          <ReportForm
+            userPosition={currentPosition}
+            onNewReport={(newReport) => setReports([...reports, newReport])}
+          />
+        </>
+      )}
+    </div>
   );
 }
