@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Fix icônes par défaut Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -12,40 +12,50 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// Composant MapView (affiche la carte + markers)
-export function MapView({ reports = [], onPositionChange }) {
+// Icônes custom
+const redIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  iconSize: [32, 32],
+});
+
+const greenIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+  iconSize: [32, 32],
+});
+
+const blueIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+  iconSize: [32, 32],
+});
+
+export default function MapView({ reports = [], solidaires = [], userPosition, onPositionChange }) {
   const defaultPos = [43.4923, -1.4746];
-  const [position, setPosition] = useState(defaultPos);
-  const [hasLocation, setHasLocation] = useState(false);
+  const [position, setPosition] = useState(userPosition || defaultPos);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      alert("La géolocalisation n'est pas supportée par votre navigateur");
-      if (onPositionChange) onPositionChange(defaultPos);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const newPos = [pos.coords.latitude, pos.coords.longitude];
-        setPosition(newPos);
-        setHasLocation(true);
-        if (onPositionChange) onPositionChange(newPos);
-      },
-      () => {
-        alert("Impossible d'obtenir votre position, localisation par défaut activée");
-        if (onPositionChange) onPositionChange(defaultPos);
+    if (!userPosition) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const newPos = [pos.coords.latitude, pos.coords.longitude];
+            setPosition(newPos);
+            if (onPositionChange) onPositionChange(newPos);
+          },
+          () => {
+            if (onPositionChange) onPositionChange(defaultPos);
+          }
+        );
       }
-    );
-  }, [onPositionChange]);
+    } else {
+      setPosition(userPosition);
+    }
+  }, [userPosition, onPositionChange]);
 
   return (
     <MapContainer
       center={position}
-      zoom={13}
-      scrollWheelZoom={true}
+      zoom={14}
       style={{ height: "500px", width: "100%" }}
-      className="leaflet-container"
     >
       <TileLayer
         attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
@@ -53,15 +63,16 @@ export function MapView({ reports = [], onPositionChange }) {
       />
 
       {/* Marker position actuelle */}
-      <Marker position={position}>
-        <Popup>{hasLocation ? "Vous êtes ici" : "Position par défaut : Bayonne"}</Popup>
+      <Marker position={position} icon={blueIcon}>
+        <Popup>Vous êtes ici</Popup>
       </Marker>
 
       {/* Markers pannes */}
       {reports.map((report, i) => (
         <Marker
-          key={i}
+          key={`report-${i}`}
           position={[report.latitude || defaultPos[0], report.longitude || defaultPos[1]]}
+          icon={redIcon}
         >
           <Popup>
             <strong>{report.nature}</strong>
@@ -74,32 +85,21 @@ export function MapView({ reports = [], onPositionChange }) {
           </Popup>
         </Marker>
       ))}
+
+      {/* Markers solidaires */}
+      {solidaires.map((s, i) => (
+        <Marker
+          key={`solidaire-${i}`}
+          position={[s.latitude || defaultPos[0], s.longitude || defaultPos[1]]}
+          icon={greenIcon}
+        >
+          <Popup>
+            <strong>{s.name}</strong>
+            <br />
+            Matériel disponible: {s.materiel}
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
-  );
-}
-
-// Composant parent (ex: App) qui combine carte + texte
-export default function App() {
-  const [reports, setReports] = useState([
-    // exemple d'un rapport
-    {
-      latitude: 43.4925,
-      longitude: -1.4740,
-      nature: "voiture-ne-demarre-pas",
-      message: "La voiture ne démarre pas du tout",
-      status: "en-attente",
-      address: "Rue des Fleurs, Bayonne",
-    },
-  ]);
-  const [currentPosition, setCurrentPosition] = useState(null);
-
-  return (
-    <div className="map-and-report-container">
-      <MapView reports={reports} onPositionChange={setCurrentPosition} />
-      <div className="report-text">
-        <h2>Signalement de la panne</h2>
-        {/* Ici tu peux mettre ton formulaire ou la liste des signalements */}
-      </div>
-    </div>
   );
 }
