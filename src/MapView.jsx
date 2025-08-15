@@ -33,82 +33,100 @@ export default function MapView({
   solidaires = [],
   userPosition,
   onPositionChange,
-  onReportClick, // nouvelle prop pour le chat
+  onReportClick,
 }) {
   const defaultPos = [43.4923, -1.4746];
   const [position, setPosition] = useState(userPosition || defaultPos);
 
-  useEffect(() => {
-    if (!userPosition) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const newPos = [pos.coords.latitude, pos.coords.longitude];
-            setPosition(newPos);
-            if (onPositionChange) onPositionChange(newPos);
-          },
-          () => {
-            if (onPositionChange) onPositionChange(defaultPos);
-          }
-        );
-      }
-    } else {
-      setPosition(userPosition);
+  // Fonction pour géolocaliser l'utilisateur à la demande
+  const locateUser = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const newPos = [pos.coords.latitude, pos.coords.longitude];
+          setPosition(newPos);
+          if (onPositionChange) onPositionChange(newPos);
+        },
+        () => {
+          if (onPositionChange) onPositionChange(defaultPos);
+        }
+      );
     }
-  }, [userPosition, onPositionChange]);
+  };
+
+  useEffect(() => {
+    // Si userPosition est défini depuis App.jsx, on l'utilise
+    if (userPosition) {
+      setPosition(userPosition);
+    } else {
+      // Sinon, tentative de géolocalisation automatique
+      locateUser();
+    }
+  }, [userPosition]);
 
   return (
-    <MapContainer center={position} zoom={14} style={{ height: "500px", width: "100%" }}>
-      <TileLayer
-        attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+      <button
+        onClick={locateUser}
+        style={{ padding: "8px 12px", alignSelf: "flex-start" }}
+      >
+        Me géolocaliser
+      </button>
 
-      {/* Marker position actuelle */}
-      <Marker position={position} icon={blueIcon}>
-        <Popup>Vous êtes ici</Popup>
-      </Marker>
+      <div style={{ width: "100%", height: "500px" }}>
+        <MapContainer center={position} zoom={14} style={{ height: "100%", width: "100%" }}>
+          <TileLayer
+            attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-      {/* Markers pannes */}
-      {reports.map((report) => (
-        <Marker
-          key={report.id}
-          position={[report.latitude || defaultPos[0], report.longitude || defaultPos[1]]}
-          icon={redIcon}
-        >
-          <Popup>
-            <strong>{report.nature}</strong>
-            <br />
-            {report.message}
-            <br />
-            Statut: {report.status}
-            <br />
-            Adresse: {report.address}
-            <br />
-            <button
-              style={{ marginTop: "5px" }}
-              onClick={() => onReportClick && onReportClick(report)}
+          {/* Marker position actuelle */}
+          <Marker position={position} icon={blueIcon}>
+            <Popup>Vous êtes ici</Popup>
+          </Marker>
+
+          {/* Markers pannes */}
+          {reports.map((report) => (
+            <Marker
+              key={report.id}
+              position={[report.latitude || defaultPos[0], report.longitude || defaultPos[1]]}
+              icon={redIcon}
             >
-              Ouvrir le chat
-            </button>
-          </Popup>
-        </Marker>
-      ))}
+              <Popup>
+                <strong>{report.nature}</strong>
+                <br />
+                {report.message}
+                <br />
+                Statut: {report.status}
+                <br />
+                Adresse: {report.address}
+                <br />
+                <button
+                  style={{ marginTop: "5px" }}
+                  onClick={() => onReportClick && onReportClick(report)}
+                >
+                  Ouvrir le chat
+                </button>
+              </Popup>
+            </Marker>
+          ))}
 
-      {/* Markers solidaires */}
-      {solidaires.map((s, i) => (
-        <Marker
-          key={`solidaire-${i}`}
-          position={[s.latitude || defaultPos[0], s.longitude || defaultPos[1]]}
-          icon={greenIcon}
-        >
-          <Popup>
-            <strong>{s.name}</strong>
-            <br />
-            Matériel disponible: {s.materiel}
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+          {/* Markers solidaires */}
+          {solidaires.map((s, i) => (
+            <Marker
+              key={`solidaire-${i}`}
+              position={[s.latitude || defaultPos[0], s.longitude || defaultPos[1]]}
+              icon={greenIcon}
+            >
+              <Popup>
+                <strong>{s.name}</strong>
+                <br />
+                Matériel disponible: {s.materiel}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+    </div>
   );
 }
