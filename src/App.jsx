@@ -4,10 +4,11 @@ import MapView from "./MapView";
 import ReportForm from "./ReportForm";
 import Chat from "./Chat"; // composant chat par panne
 
+import { db } from "./firebase"; // ton firebase.js
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
+
 export default function App() {
   const [user, setUser] = useState(null);
-
-  // On commence par null, on mettra à jour dès qu'on récupère la position réelle
   const [currentPosition, setCurrentPosition] = useState(null);
 
   const [reports, setReports] = useState([
@@ -23,9 +24,9 @@ export default function App() {
   ]);
 
   const [solidaires, setSolidaires] = useState([]);
-  const [activeReport, setActiveReport] = useState(null); // Panne sélectionnée pour le chat
+  const [activeReport, setActiveReport] = useState(null);
 
-  // Geolocalisation automatique
+  // 🔹 Geolocalisation automatique
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -57,6 +58,38 @@ export default function App() {
     ]);
   };
 
+  // 🔹 Écoute en temps réel de tous les utilisateurs connectés
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
+      const users = snapshot.docs.map((doc) => doc.data());
+      setSolidaires(users);
+    });
+    return () => unsub();
+  }, []);
+
+  // 🔹 Mise à jour de la position de l'utilisateur dans Firestore
+  useEffect(() => {
+    if (user && currentPosition) {
+      const userDoc = doc(db, "solidaires", user.uid);
+      setDoc(userDoc, {
+        uid: user.uid,
+        name: user.email,
+        latitude: currentPosition[0],
+        longitude: currentPosition[1],
+        materiel: user.materiel || "pinces", // ou récupérer depuis ton formulaire
+      });
+    }
+  }, [currentPosition, user]);
+
+  // 🔹 Supprimer l'utilisateur de Firestore à la déconnexion
+  useEffect(() => {
+    return () => {
+      if (user) {
+        deleteDoc(doc(db, "solidaires", user.uid));
+      }
+    };
+  }, [user]);
+
   return (
     <div
       style={{
@@ -76,7 +109,7 @@ export default function App() {
           {/* Carte */}
           <MapView
             reports={reports}
-            solidaires={solidaires}
+            solidaires={solidaires} // 🔹 tous les utilisateurs connectés
             userPosition={currentPosition}
             onPositionChange={setCurrentPosition}
             onReportClick={setActiveReport}

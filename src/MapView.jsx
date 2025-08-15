@@ -121,7 +121,7 @@ export default function MapView({
               <Popup>
                 <strong>{s.name}</strong>
                 <br />
-                Matériel disponible: {s.materiel}
+                Matériel disponible: {s.materiel || "Non renseigné"}
               </Popup>
             </Marker>
           ))}
