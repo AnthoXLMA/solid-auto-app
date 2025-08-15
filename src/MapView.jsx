@@ -28,7 +28,13 @@ const blueIcon = new L.Icon({
   iconSize: [32, 32],
 });
 
-export default function MapView({ reports = [], solidaires = [], userPosition, onPositionChange }) {
+export default function MapView({
+  reports = [],
+  solidaires = [],
+  userPosition,
+  onPositionChange,
+  onReportClick, // nouvelle prop pour le chat
+}) {
   const defaultPos = [43.4923, -1.4746];
   const [position, setPosition] = useState(userPosition || defaultPos);
 
@@ -52,11 +58,7 @@ export default function MapView({ reports = [], solidaires = [], userPosition, o
   }, [userPosition, onPositionChange]);
 
   return (
-    <MapContainer
-      center={position}
-      zoom={14}
-      style={{ height: "500px", width: "100%" }}
-    >
+    <MapContainer center={position} zoom={14} style={{ height: "500px", width: "100%" }}>
       <TileLayer
         attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -68,9 +70,9 @@ export default function MapView({ reports = [], solidaires = [], userPosition, o
       </Marker>
 
       {/* Markers pannes */}
-      {reports.map((report, i) => (
+      {reports.map((report) => (
         <Marker
-          key={`report-${i}`}
+          key={report.id}
           position={[report.latitude || defaultPos[0], report.longitude || defaultPos[1]]}
           icon={redIcon}
         >
@@ -82,6 +84,13 @@ export default function MapView({ reports = [], solidaires = [], userPosition, o
             Statut: {report.status}
             <br />
             Adresse: {report.address}
+            <br />
+            <button
+              style={{ marginTop: "5px" }}
+              onClick={() => onReportClick && onReportClick(report)}
+            >
+              Ouvrir le chat
+            </button>
           </Popup>
         </Marker>
       ))}
