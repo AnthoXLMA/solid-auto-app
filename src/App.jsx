@@ -61,35 +61,35 @@ export default function App() {
 
   // 🔹 Création de solidaires fictifs (une seule fois)
   const createFakeUsers = async () => {
-  const fakeUsers = [
-    { uid: "fake1", name: "Alice", latitude: 43.493, longitude: -1.475, materiel: "batterie" },
-    { uid: "fake2", name: "Bob", latitude: 43.491, longitude: -1.476, materiel: "pneu" },
-    { uid: "fake3", name: "Charlie", latitude: 43.492, longitude: -1.474, materiel: "carburant" },
-    { uid: "fake4", name: "David", latitude: 48.8566, longitude: 2.3522, materiel: "huile" },
-    { uid: "fake5", name: "Emma", latitude: 45.7640, longitude: 4.8357, materiel: "clé" },
-    { uid: "fake6", name: "Fiona", latitude: 43.2965, longitude: 5.3698, materiel: "tournevis" },
-    { uid: "fake7", name: "George", latitude: 43.6047, longitude: 1.4442, materiel: "pinces" },
-    { uid: "fake8", name: "Hannah", latitude: 43.7102, longitude: 7.2620, materiel: "batterie" },
-    { uid: "fake9", name: "Ian", latitude: 47.2184, longitude: -1.5536, materiel: "pneu" },
-    { uid: "fake10", name: "Julia", latitude: 48.5734, longitude: 7.7521, materiel: "carburant" },
-    { uid: "fake11", name: "Kevin", latitude: 43.6108, longitude: 3.8767, materiel: "huile" },
-    { uid: "fake12", name: "Laura", latitude: 48.1173, longitude: -1.6778, materiel: "clé" },
-    { uid: "fake13", name: "Mike", latitude: 45.1885, longitude: 5.7245, materiel: "tournevis" },
-    { uid: "fake14", name: "Nina", latitude: 47.3220, longitude: 5.0415, materiel: "pinces" },
-    { uid: "fake15", name: "Oscar", latitude: 45.7772, longitude: 3.0870, materiel: "batterie" },
-  ];
+    const fakeUsers = [
+      { uid: "fake1", name: "Alice", latitude: 43.493, longitude: -1.475, materiel: "batterie" },
+      { uid: "fake2", name: "Bob", latitude: 43.491, longitude: -1.476, materiel: "pneu" },
+      { uid: "fake3", name: "Charlie", latitude: 43.492, longitude: -1.474, materiel: "carburant" },
+      { uid: "fake4", name: "David", latitude: 48.8566, longitude: 2.3522, materiel: "huile" },
+      { uid: "fake5", name: "Emma", latitude: 45.7640, longitude: 4.8357, materiel: "clé" },
+      { uid: "fake6", name: "Fiona", latitude: 43.2965, longitude: 5.3698, materiel: "tournevis" },
+      { uid: "fake7", name: "George", latitude: 43.6047, longitude: 1.4442, materiel: "pinces" },
+      { uid: "fake8", name: "Hannah", latitude: 43.7102, longitude: 7.2620, materiel: "batterie" },
+      { uid: "fake9", name: "Ian", latitude: 47.2184, longitude: -1.5536, materiel: "pneu" },
+      { uid: "fake10", name: "Julia", latitude: 48.5734, longitude: 7.7521, materiel: "carburant" },
+      { uid: "fake11", name: "Kevin", latitude: 43.6108, longitude: 3.8767, materiel: "huile" },
+      { uid: "fake12", name: "Laura", latitude: 48.1173, longitude: -1.6778, materiel: "clé" },
+      { uid: "fake13", name: "Mike", latitude: 45.1885, longitude: 5.7245, materiel: "tournevis" },
+      { uid: "fake14", name: "Nina", latitude: 47.3220, longitude: 5.0415, materiel: "pinces" },
+      { uid: "fake15", name: "Oscar", latitude: 45.7772, longitude: 3.0870, materiel: "batterie" },
+    ];
 
-  for (const u of fakeUsers) {
-    try {
-      const userDoc = await getDoc(doc(db, "solidaires", u.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "solidaires", u.uid), u);
+    for (const u of fakeUsers) {
+      try {
+        const userDoc = await getDoc(doc(db, "solidaires", u.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, "solidaires", u.uid), u);
+        }
+      } catch (err) {
+        console.error("Erreur création user fictif :", err);
       }
-    } catch (err) {
-      console.error("Erreur création user fictif :", err);
     }
-  }
-};
+  };
 
   useEffect(() => {
     createFakeUsers();
@@ -137,67 +137,67 @@ export default function App() {
     }
   }, [currentPosition, user]);
 
-    // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
-const filteredSolidaires = solidaires.map((s) => {
-  if (!activeReport) {
-    // Avant panne : tout le monde visible
-    return { ...s, status: "normal" };
-  }
+  // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
+  const filteredSolidaires = solidaires.map((s) => {
+    if (!activeReport) {
+      // Avant panne : tout le monde visible
+      return { ...s, status: "normal" };
+    }
 
-  // Après panne : vérifier pertinence et alertes
-  const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
-  const isRelevant =
-    s.materiel &&
-    activeReport.nature &&
-    s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+    // Après panne : vérifier pertinence et alertes
+    const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+    const isRelevant =
+      s.materiel &&
+      activeReport.nature &&
+      s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
 
-  return {
-    ...s,
-    alreadyAlerted,
-    status: alreadyAlerted ? "alerted" : isRelevant ? "relevant" : "irrelevant",
-  };
-});
-
+    return {
+      ...s,
+      alreadyAlerted,
+      status: alreadyAlerted ? "alerted" : isRelevant ? "relevant" : "irrelevant",
+    };
+  });
 
   // 🔹 Fonction pour alerter un solidaire
-const onAlertUser = async (solidaire) => {
-  if (!activeReport || !user) return;
-  try {
-    await addDoc(collection(db, "alertes"), {
-      fromUid: user.uid,
-      toUid: solidaire.uid,
-      reportId: activeReport.id,
-      status: "envoyée",
-      timestamp: serverTimestamp(),
-    });
+  const onAlertUser = async (solidaire) => {
+    if (!activeReport || !user) return;
+    try {
+      await addDoc(collection(db, "alertes"), {
+        fromUid: user.uid,
+        toUid: solidaire.uid,
+        reportId: activeReport.id,
+        status: "envoyée",
+        timestamp: serverTimestamp(),
+      });
 
-    await updateDoc(doc(db, "reports", activeReport.id), {
-      status: "aide en cours",
-      helperUid: solidaire.uid,
-    });
+      await updateDoc(doc(db, "reports", activeReport.id), {
+        status: "aide en cours",
+        helperUid: solidaire.uid,
+      });
 
-    // ✅ Mise à jour immédiate du state local pour refléter l’alerte
-    setActiveReport((prev) =>
-      prev && prev.id === activeReport.id
-        ? { ...prev, status: "aide en cours", helperUid: solidaire.uid }
-        : prev
-    );
-    setReports((prev) =>
-      prev.map((r) =>
-        r.id === activeReport.id
-          ? { ...r, status: "aide en cours", helperUid: solidaire.uid }
-          : r
-      )
-    );
+      // ✅ Mise à jour immédiate du state local pour refléter l’alerte
+      setActiveReport((prev) =>
+        prev && prev.id === activeReport.id
+          ? { ...prev, status: "aide en cours", helperUid: solidaire.uid }
+          : prev
+      );
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === activeReport.id
+            ? { ...r, status: "aide en cours", helperUid: solidaire.uid }
+            : r
+        )
+      );
 
-    toast.success(`✅ Alerte envoyée à ${solidaire.name} !`);
-  } catch (err) {
-    console.error("Erreur alerte :", err);
-    toast.error("⚠️ Impossible d'envoyer l'alerte.");
-  }
-};
+      toast.success(`✅ Alerte envoyée à ${solidaire.name} !`);
+    } catch (err) {
+      console.error("Erreur alerte :", err);
+      toast.error("⚠️ Impossible d'envoyer l'alerte.");
+    }
+  };
 
-
+  // 🔹 AJOUT : Exemple d’affichage de ma réponse directement
+  const myResponse = user.email;
 
   return (
     <div
@@ -218,6 +218,9 @@ const onAlertUser = async (solidaire) => {
       ) : (
         <>
           <h2>Bienvenue {user.email}</h2>
+
+          {/* 🔹 Affichage de ma réponse dans l'UI */}
+          <p style={{ color: "green", fontWeight: "bold" }}>{myResponse}</p>
 
           <MapView
             reports={reports}
