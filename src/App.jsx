@@ -118,6 +118,9 @@ export default function App() {
     try {
       const docRef = await addDoc(collection(db, "reports"), {
         ...newReport,
+        ownerUid: user.uid,   // ✅ qui a créé la demande
+        helperUid: null,      // ✅ personne encore assignée
+        notified: false,      // ✅ servira pour ton toast
         status: "en attente",
         timestamp: serverTimestamp(),
       });
