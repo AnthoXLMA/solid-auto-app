@@ -154,7 +154,6 @@ const filteredSolidaires = activeReport
     )
   : [];
 
-
   // 🔹 Fonction pour alerter un solidaire
 const onAlertUser = async (solidaire) => {
   if (!activeReport || !user) return;
