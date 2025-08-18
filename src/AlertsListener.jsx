@@ -20,13 +20,14 @@ export default function AlertsListener({ user }) {
     return () => unsub();
   }, [user]);
 
-  // 🔹 Fonction pour accepter une alerte
   const acceptAlert = async (alert) => {
     try {
+      // Mettre à jour l'alerte
       await updateDoc(doc(db, "alertes", alert.id), {
         status: "accepté"
       });
 
+      // Mettre à jour le report
       await updateDoc(doc(db, "reports", alert.reportId), {
         status: "aide confirmée",
         helperUid: user.uid,
