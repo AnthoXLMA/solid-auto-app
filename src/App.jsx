@@ -138,21 +138,26 @@ export default function App() {
   }, [currentPosition, user]);
 
     // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
-const filteredSolidaires = activeReport
-  ? solidaires.map((s) => {
-      // Vérifier si ce solidaire a déjà été alerté
-      const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
-      return {
-        ...s,
-        alreadyAlerted,
-      };
-    }).filter(
-      (s) =>
-        s.materiel &&
-        activeReport.nature &&
-        s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
-    )
-  : [];
+const filteredSolidaires = solidaires.map((s) => {
+  if (!activeReport) {
+    // Avant panne : tout le monde visible
+    return { ...s, status: "normal" };
+  }
+
+  // Après panne : vérifier pertinence et alertes
+  const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+  const isRelevant =
+    s.materiel &&
+    activeReport.nature &&
+    s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+
+  return {
+    ...s,
+    alreadyAlerted,
+    status: alreadyAlerted ? "alerted" : isRelevant ? "relevant" : "irrelevant",
+  };
+});
+
 
   // 🔹 Fonction pour alerter un solidaire
 const onAlertUser = async (solidaire) => {

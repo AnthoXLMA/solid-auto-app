@@ -15,8 +15,8 @@ const reportIcon = new L.Icon({
 });
 
 const solidaireIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/2921/2921222.png",
-  iconSize: [25, 25],
+  iconUrl: "https://img.icons8.com/?size=100&id=AmvvpYN8jrzG&format=png&color=000000",
+  iconSize: [30, 30],
 });
 
 const alertedIcon = new L.Icon({
@@ -62,6 +62,15 @@ export default function MapView({
 }) {
   if (!userPosition) return <div>📍 Localisation en cours...</div>;
 
+  const getIconByStatus = (status) => {
+    switch (status) {
+      case "relevant": return solidaireHighlightIcon;
+      case "alerted": return solidaireAlertedIcon;
+      case "irrelevant": return solidaireIcon;
+      default: return solidaireIcon; // normal
+    }
+  };
+
   return (
     <MapContainer
       center={userPosition}
@@ -85,9 +94,7 @@ export default function MapView({
           key={report.id}
           position={[report.latitude, report.longitude]}
           icon={reportIcon}
-          eventHandlers={{
-            click: () => onReportClick(report),
-          }}
+          eventHandlers={{ click: () => onReportClick(report) }}
         >
           <Popup>
             <strong>⚠️ Panne :</strong> {report.nature} <br />
@@ -103,28 +110,25 @@ export default function MapView({
 
       {/* Marqueurs des solidaires */}
       {solidaires.map((s) => {
-        let iconToUse = solidaireIcon;
-
-        // 1️⃣ Si déjà alerté → icône spéciale
-        if (activeReport && activeReport.helperUid === s.uid) {
-          iconToUse = solidaireAlertedIcon;
-        }
-        // 2️⃣ Sinon, si pertinent pour la panne → icône surlignée
-        else if (
-          activeReport &&
-          s.materiel &&
-          activeReport.nature &&
-          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
-        ) {
-          iconToUse = solidaireHighlightIcon;
+        // Déterminer le status
+        let status = "normal";
+        if (activeReport) {
+          if (activeReport.helperUid === s.uid) status = "alerted";
+          else if (
+            s.materiel &&
+            activeReport.nature &&
+            s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
+          )
+            status = "relevant";
+          else status = "irrelevant";
         }
 
         return (
-          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={iconToUse}>
+          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getIconByStatus(status)}>
             <Popup>
               <strong>👤 {s.name}</strong> <br />
               Matériel : {s.materiel} <br />
-              {activeReport && activeReport.helperUid === s.uid ? (
+              {status === "alerted" ? (
                 <span style={{ color: "orange", fontWeight: "bold" }}>
                   📞 Déjà alerté – en attente
                 </span>
