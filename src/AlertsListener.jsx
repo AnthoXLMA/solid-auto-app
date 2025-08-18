@@ -14,7 +14,7 @@ export default function AlertsListener({ user }) {
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
-      setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setAlerts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => unsub();
