@@ -40,7 +40,17 @@ const phoneIcon = new L.Icon({
   iconSize: [28, 28],
 });
 
+// 🔹 Icône spéciale si pertinent pour la panne
+const solidaireHighlightIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/190/190411.png", // icône verte (ou autre)
+  iconSize: [30, 30],
+});
 
+// 🔹 Icône pour solidaire déjà alerté
+const solidaireAlertedIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/597/597177.png", // téléphone par ex.
+  iconSize: [30, 30],
+});
 
 export default function MapView({
   reports,
@@ -91,22 +101,32 @@ export default function MapView({
         </Marker>
       ))}
 
-      {/* Marqueurs des solidaires filtrés */}
+      {/* Marqueurs des solidaires */}
       {solidaires.map((s) => {
-        const isAlerted = !!(activeReport && activeReport.helperUid === s.uid);
+        let iconToUse = solidaireIcon;
+
+        // 1️⃣ Si déjà alerté → icône spéciale
+        if (activeReport && activeReport.helperUid === s.uid) {
+          iconToUse = solidaireAlertedIcon;
+        }
+        // 2️⃣ Sinon, si pertinent pour la panne → icône surlignée
+        else if (
+          activeReport &&
+          s.materiel &&
+          activeReport.nature &&
+          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
+        ) {
+          iconToUse = solidaireHighlightIcon;
+        }
 
         return (
-          <Marker
-            key={`${s.uid}-${isAlerted ? "alerted" : "idle"}`}
-            position={[s.latitude, s.longitude]}
-            icon={isAlerted ? phoneIcon : solidaireIcon} // 🔹 téléphone si alerté
-          >
+          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={iconToUse}>
             <Popup>
               <strong>👤 {s.name}</strong> <br />
               Matériel : {s.materiel} <br />
-              {isAlerted ? (
+              {activeReport && activeReport.helperUid === s.uid ? (
                 <span style={{ color: "orange", fontWeight: "bold" }}>
-                  📞 Déjà contacté – en attente de réponse
+                  📞 Déjà alerté – en attente
                 </span>
               ) : (
                 <button
