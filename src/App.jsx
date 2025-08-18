@@ -7,29 +7,25 @@ import AlertsListener from "./AlertsListener";
 
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  setDoc,
-  deleteDoc,
-  getDoc,
-  addDoc,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import useReportsListener from "./useReportsListener";
+
 export default function App() {
+  // 🔹 States
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState(null);
   const [reports, setReports] = useState([]);
   const [solidaires, setSolidaires] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
 
-  // 🔹 Surveille l’état d’auth
+  // 🔹 Hook pour récupérer les reports de l'utilisateur
+  const userReports = useReportsListener(user);
+
+  // 🔹 Surveille l’état d’auth (une seule fois)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -40,14 +36,11 @@ export default function App() {
           setUser(currentUser);
         }
       } else {
-        if (user) {
-          await deleteDoc(doc(db, "solidaires", user.uid));
-        }
         setUser(null);
       }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   // 🔹 Géolocalisation
   useEffect(() => {
@@ -60,57 +53,40 @@ export default function App() {
   }, []);
 
   // 🔹 Création de solidaires fictifs (une seule fois)
-  const createFakeUsers = async () => {
-    const fakeUsers = [
-      { uid: "fake1", name: "Alice", latitude: 43.493, longitude: -1.475, materiel: "batterie" },
-      { uid: "fake2", name: "Bob", latitude: 43.491, longitude: -1.476, materiel: "pneu" },
-      { uid: "fake3", name: "Charlie", latitude: 43.492, longitude: -1.474, materiel: "carburant" },
-      { uid: "fake4", name: "David", latitude: 48.8566, longitude: 2.3522, materiel: "huile" },
-      { uid: "fake5", name: "Emma", latitude: 45.7640, longitude: 4.8357, materiel: "clé" },
-      { uid: "fake6", name: "Fiona", latitude: 43.2965, longitude: 5.3698, materiel: "tournevis" },
-      { uid: "fake7", name: "George", latitude: 43.6047, longitude: 1.4442, materiel: "pinces" },
-      { uid: "fake8", name: "Hannah", latitude: 43.7102, longitude: 7.2620, materiel: "batterie" },
-      { uid: "fake9", name: "Ian", latitude: 47.2184, longitude: -1.5536, materiel: "pneu" },
-      { uid: "fake10", name: "Julia", latitude: 48.5734, longitude: 7.7521, materiel: "carburant" },
-      { uid: "fake11", name: "Kevin", latitude: 43.6108, longitude: 3.8767, materiel: "huile" },
-      { uid: "fake12", name: "Laura", latitude: 48.1173, longitude: -1.6778, materiel: "clé" },
-      { uid: "fake13", name: "Mike", latitude: 45.1885, longitude: 5.7245, materiel: "tournevis" },
-      { uid: "fake14", name: "Nina", latitude: 47.3220, longitude: 5.0415, materiel: "pinces" },
-      { uid: "fake15", name: "Oscar", latitude: 45.7772, longitude: 3.0870, materiel: "batterie" },
-    ];
-
-    for (const u of fakeUsers) {
-      try {
-        const userDoc = await getDoc(doc(db, "solidaires", u.uid));
-        if (!userDoc.exists()) {
-          await setDoc(doc(db, "solidaires", u.uid), u);
-        }
-      } catch (err) {
-        console.error("Erreur création user fictif :", err);
-      }
-    }
-  };
-
   useEffect(() => {
+    const createFakeUsers = async () => {
+      const fakeUsers = [
+        { uid: "fake1", name: "Alice", latitude: 43.493, longitude: -1.475, materiel: "batterie" },
+        { uid: "fake2", name: "Bob", latitude: 43.491, longitude: -1.476, materiel: "pneu" },
+        { uid: "fake3", name: "Charlie", latitude: 43.492, longitude: -1.474, materiel: "carburant" },
+        { uid: "fake4", name: "David", latitude: 48.8566, longitude: 2.3522, materiel: "huile" },
+        { uid: "fake5", name: "Emma", latitude: 45.7640, longitude: 4.8357, materiel: "clé" },
+        { uid: "fake6", name: "Fiona", latitude: 43.2965, longitude: 5.3698, materiel: "tournevis" },
+        { uid: "fake7", name: "George", latitude: 43.6047, longitude: 1.4442, materiel: "pinces" },
+        { uid: "fake8", name: "Hannah", latitude: 43.7102, longitude: 7.2620, materiel: "batterie" },
+        { uid: "fake9", name: "Ian", latitude: 47.2184, longitude: -1.5536, materiel: "pneu" },
+        { uid: "fake10", name: "Julia", latitude: 48.5734, longitude: 7.7521, materiel: "carburant" },
+        { uid: "fake11", name: "Kevin", latitude: 43.6108, longitude: 3.8767, materiel: "huile" },
+        { uid: "fake12", name: "Laura", latitude: 48.1173, longitude: -1.6778, materiel: "clé" },
+        { uid: "fake13", name: "Mike", latitude: 45.1885, longitude: 5.7245, materiel: "tournevis" },
+        { uid: "fake14", name: "Nina", latitude: 47.3220, longitude: 5.0415, materiel: "pinces" },
+        { uid: "fake15", name: "Oscar", latitude: 45.7772, longitude: 3.0870, materiel: "batterie" },
+      ];
+
+      for (const u of fakeUsers) {
+        try {
+          const userDoc = await getDoc(doc(db, "solidaires", u.uid));
+          if (!userDoc.exists()) {
+            await setDoc(doc(db, "solidaires", u.uid), u);
+          }
+        } catch (err) {
+          console.error("Erreur création user fictif :", err);
+        }
+      }
+    };
+
     createFakeUsers();
   }, []);
-
-  const handleNewReport = async (newReport) => {
-    try {
-      const docRef = await addDoc(collection(db, "reports"), {
-        ...newReport,
-        status: "en attente",
-        timestamp: serverTimestamp(),
-      });
-
-      const reportWithId = { ...newReport, id: docRef.id };
-      setReports([...reports, reportWithId]);
-      setActiveReport(reportWithId);
-    } catch (err) {
-      console.error("Erreur création report :", err);
-      alert("⚠️ Impossible de créer le rapport.");
-    }
-  };
 
   // 🔹 Écoute temps réel des solidaires
   useEffect(() => {
@@ -137,14 +113,28 @@ export default function App() {
     }
   }, [currentPosition, user]);
 
-  // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
-  const filteredSolidaires = solidaires.map((s) => {
-    if (!activeReport) {
-      // Avant panne : tout le monde visible
-      return { ...s, status: "normal" };
-    }
+  // 🔹 Création de report
+  const handleNewReport = async (newReport) => {
+    try {
+      const docRef = await addDoc(collection(db, "reports"), {
+        ...newReport,
+        status: "en attente",
+        timestamp: serverTimestamp(),
+      });
 
-    // Après panne : vérifier pertinence et alertes
+      const reportWithId = { ...newReport, id: docRef.id };
+      setReports((prev) => [...prev, reportWithId]);
+      setActiveReport(reportWithId);
+    } catch (err) {
+      console.error("Erreur création report :", err);
+      toast.error("⚠️ Impossible de créer le rapport.");
+    }
+  };
+
+  // 🔹 Filtrage des solidaires pour le rapport actif
+  const filteredSolidaires = solidaires.map((s) => {
+    if (!activeReport) return { ...s, status: "normal" };
+
     const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
     const isRelevant =
       s.materiel &&
@@ -158,9 +148,10 @@ export default function App() {
     };
   });
 
-  // 🔹 Fonction pour alerter un solidaire
+  // 🔹 Alerter un solidaire
   const onAlertUser = async (solidaire) => {
     if (!activeReport || !user) return;
+
     try {
       await addDoc(collection(db, "alertes"), {
         fromUid: user.uid,
@@ -175,7 +166,6 @@ export default function App() {
         helperUid: solidaire.uid,
       });
 
-      // ✅ Mise à jour immédiate du state local pour refléter l’alerte
       setActiveReport((prev) =>
         prev && prev.id === activeReport.id
           ? { ...prev, status: "aide en cours", helperUid: solidaire.uid }
@@ -197,15 +187,7 @@ export default function App() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "20px",
-        padding: "20px",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
 
       {user && <AlertsListener user={user} />}
@@ -215,6 +197,15 @@ export default function App() {
       ) : (
         <>
           <h2>Bienvenue {user.email}</h2>
+
+          <h3>Mes demandes</h3>
+          <ul>
+            {userReports.map((r) => (
+              <li key={r.id}>
+                {r.description} - Status: {r.status}
+              </li>
+            ))}
+          </ul>
 
           <MapView
             reports={reports}
