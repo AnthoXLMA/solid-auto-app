@@ -196,9 +196,6 @@ export default function App() {
     }
   };
 
-  // 🔹 AJOUT : Exemple d’affichage de ma réponse directement
-  const myResponse = user.email;
-
   return (
     <div
       style={{
@@ -218,9 +215,6 @@ export default function App() {
       ) : (
         <>
           <h2>Bienvenue {user.email}</h2>
-
-          {/* 🔹 Affichage de ma réponse dans l'UI */}
-          <p style={{ color: "green", fontWeight: "bold" }}>{myResponse}</p>
 
           <MapView
             reports={reports}
