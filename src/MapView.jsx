@@ -1,132 +1,100 @@
-import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
+import React from "react";
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
-// Fix icônes par défaut Leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+// 🔹 Icônes custom
+const userIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1077/1077012.png",
+  iconSize: [30, 30],
 });
 
-// Icônes custom
-const redIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-  iconSize: [32, 32],
+const reportIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1828/1828843.png",
+  iconSize: [25, 25],
 });
 
-const greenIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-  iconSize: [32, 32],
-});
-
-const blueIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-  iconSize: [32, 32],
+const solidaireIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/2921/2921222.png",
+  iconSize: [25, 25],
 });
 
 export default function MapView({
-  reports = [],
-  solidaires = [],
+  reports,
+  solidaires,
   userPosition,
   onPositionChange,
   onReportClick,
+  onAlertUser,
+  activeReport, // <-- ajouté
 }) {
-  const defaultPos = [43.4923, -1.4746];
-  const [position, setPosition] = useState(userPosition || defaultPos);
-
-  // Fonction pour géolocaliser l'utilisateur à la demande
-  const locateUser = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const newPos = [pos.coords.latitude, pos.coords.longitude];
-          setPosition(newPos);
-          if (onPositionChange) onPositionChange(newPos);
-        },
-        () => {
-          if (onPositionChange) onPositionChange(defaultPos);
-        }
-      );
-    }
-  };
-
-  useEffect(() => {
-    // Si userPosition est défini depuis App.jsx, on l'utilise
-    if (userPosition) {
-      setPosition(userPosition);
-    } else {
-      // Sinon, tentative de géolocalisation automatique
-      locateUser();
-    }
-  }, [userPosition]);
+  if (!userPosition) return <div>📍 Localisation en cours...</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
-      <button
-        onClick={locateUser}
-        style={{ padding: "8px 12px", alignSelf: "flex-start" }}
-      >
-        Me géolocaliser
-      </button>
+    <MapContainer
+      center={userPosition}
+      zoom={6}
+      style={{ height: "500px", width: "100%" }}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
 
-      <div style={{ width: "100%", height: "500px" }}>
-        <MapContainer center={position} zoom={14} style={{ height: "100%", width: "100%" }}>
-          <TileLayer
-            attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+      {/* Marqueur utilisateur */}
+      <Marker position={userPosition} icon={userIcon}>
+        <Popup>🙋‍♂️ Vous êtes ici</Popup>
+      </Marker>
 
-          {/* Marker position actuelle */}
-          <Marker position={position} icon={blueIcon}>
-            <Popup>Vous êtes ici</Popup>
-          </Marker>
-
-          {/* Markers pannes */}
-          {reports.map((report) => (
-            <Marker
-              key={report.id}
-              position={[report.latitude || defaultPos[0], report.longitude || defaultPos[1]]}
-              icon={redIcon}
+      {/* Marqueurs des pannes */}
+      {reports.map((report) => (
+        <Marker
+          key={report.id}
+          position={[report.latitude, report.longitude]}
+          icon={reportIcon}
+          eventHandlers={{
+            click: () => onReportClick(report),
+          }}
+        >
+          <Popup>
+            <strong>⚠️ Panne :</strong> {report.nature} <br />
+            <button
+              style={{ marginTop: "5px", cursor: "pointer" }}
+              onClick={() => onReportClick(report)}
             >
-              <Popup>
-                <strong>{report.nature}</strong>
-                <br />
-                {report.message}
-                <br />
-                Statut: {report.status}
-                <br />
-                Adresse: {report.address}
-                <br />
-                <button
-                  style={{ marginTop: "5px" }}
-                  onClick={() => onReportClick && onReportClick(report)}
-                >
-                  Ouvrir le chat
-                </button>
-              </Popup>
-            </Marker>
-          ))}
+              🔍 Voir détails
+            </button>
+          </Popup>
+        </Marker>
+      ))}
 
-          {/* Markers solidaires */}
-          {solidaires.map((s, i) => (
-            <Marker
-              key={`solidaire-${i}`}
-              position={[s.latitude || defaultPos[0], s.longitude || defaultPos[1]]}
-              icon={greenIcon}
-            >
-              <Popup>
-                <strong>{s.name}</strong>
-                <br />
-                Matériel disponible: {s.materiel || "Non renseigné"}
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-      </div>
-    </div>
+      {/* Marqueurs des solidaires filtrés */}
+{solidaires.map((s) => (
+  <Marker
+    key={s.uid}
+    position={[s.latitude, s.longitude]}
+    icon={solidaireIcon}
+  >
+    <Popup>
+      <strong>👤 {s.name}</strong> <br />
+      Matériel : {s.materiel} <br />
+      {activeReport && activeReport.helperUid === s.uid ? (
+        <span style={{ color: "orange", fontWeight: "bold" }}>
+          ⚠️ Déjà alerté – réponse en attente
+        </span>
+      ) : (
+        <button
+          style={{ marginTop: "5px", cursor: "pointer" }}
+          onClick={() => onAlertUser(s)}
+        >
+          ⚡ Alerter
+        </button>
+      )}
+    </Popup>
+  </Marker>
+))}
+
+    </MapContainer>
   );
 }

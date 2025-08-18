@@ -3,10 +3,24 @@ import Auth from "./Auth";
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
 import Chat from "./Chat";
+import AlertsListener from "./AlertsListener";
 
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  setDoc,
+  deleteDoc,
+  getDoc,
+  addDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -15,7 +29,7 @@ export default function App() {
   const [solidaires, setSolidaires] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
 
-  // 🔹 Surveille l’état d’auth pour ne pas perdre la session
+  // 🔹 Surveille l’état d’auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -26,11 +40,14 @@ export default function App() {
           setUser(currentUser);
         }
       } else {
+        if (user) {
+          await deleteDoc(doc(db, "solidaires", user.uid));
+        }
         setUser(null);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // 🔹 Géolocalisation
   useEffect(() => {
@@ -42,39 +59,43 @@ export default function App() {
     }
   }, []);
 
-  // 🔹 Fonction pour créer des utilisateurs fictifs
   const createFakeUsers = async () => {
   const fakeUsers = [
-  { uid: "fake-1", name: "Paul", latitude: 48.8566, longitude: 2.3522, materiel: "batterie" },     // Paris
-  { uid: "fake-2", name: "Sophie", latitude: 45.7640, longitude: 4.8357, materiel: "pneu" },      // Lyon
-  { uid: "fake-3", name: "Karim", latitude: 43.6045, longitude: 1.4440, materiel: "carburant" },  // Toulouse
-  { uid: "fake-4", name: "Julie", latitude: 43.2965, longitude: 5.3698, materiel: "batterie" },   // Marseille
-  { uid: "fake-5", name: "Marc", latitude: 49.2583, longitude: 4.0317, materiel: "pneu" },       // Reims
-  { uid: "fake-6", name: "Emma", latitude: 48.5734, longitude: 7.7521, materiel: "batterie" },    // Strasbourg
-  { uid: "fake-7", name: "Léa", latitude: 50.6292, longitude: 3.0573, materiel: "carburant" },   // Lille
-  { uid: "fake-8", name: "Lucas", latitude: 44.8378, longitude: -0.5792, materiel: "pneu" },     // Bordeaux
-  { uid: "fake-9", name: "Nora", latitude: 47.2184, longitude: -1.5536, materiel: "batterie" },  // Nantes
-  { uid: "fake-10", name: "Thomas", latitude: 45.1885, longitude: 5.7245, materiel: "pneu" },    // Grenoble
-  { uid: "fake-11", name: "Alice", latitude: 43.6108, longitude: 3.8767, materiel: "carburant" },// Montpellier
-  { uid: "fake-12", name: "Julien", latitude: 48.6921, longitude: 6.1844, materiel: "batterie" },// Nancy
-  { uid: "fake-13", name: "Chloé", latitude: 43.7102, longitude: 7.2620, materiel: "pneu" },    // Nice
-  { uid: "fake-14", name: "Antoine", latitude: 46.6034, longitude: 1.8883, materiel: "carburant" },// Centre France
-];
+    { uid: "fake-1", name: "Paul", latitude: 48.8566, longitude: 2.3522, materiel: "batterie" },
+    { uid: "fake-2", name: "Sophie", latitude: 45.7640, longitude: 4.8357, materiel: "pneu" },
+    { uid: "fake-3", name: "Karim", latitude: 43.6045, longitude: 1.4440, materiel: "carburant" },
+    { uid: "fake-4", name: "Julie", latitude: 43.2965, longitude: 5.3698, materiel: "batterie" },
+    { uid: "fake-5", name: "Marc", latitude: 49.2583, longitude: 4.0317, materiel: "pneu" },
+  ];
 
   for (const u of fakeUsers) {
-    await setDoc(doc(db, "solidaires", u.uid), u);
+    const docRef = doc(db, "solidaires", u.uid);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      await setDoc(docRef, u);
+    }
   }
-
-  console.log("✅ Utilisateurs fictifs ajoutés !");
+  toast.success("✅ Utilisateurs fictifs ajoutés !");
 };
 
 
-  // 🔹 Création d’une nouvelle panne et activation directe
-  const handleNewReport = (newReport) => {
-    const reportWithId = { ...newReport, id: `report-${reports.length + 1}` };
+const handleNewReport = async (newReport) => {
+  try {
+    const docRef = await addDoc(collection(db, "reports"), {
+      ...newReport,
+      status: "en attente",
+      timestamp: serverTimestamp(),
+    });
+
+    const reportWithId = { ...newReport, id: docRef.id };
     setReports([...reports, reportWithId]);
-    setActiveReport(reportWithId); // <- nouvelle ligne : active la panne dès sa création
-  };
+    setActiveReport(reportWithId);
+  } catch (err) {
+    console.error("Erreur création report :", err);
+    alert("⚠️ Impossible de créer le rapport.");
+  }
+};
+
 
   // 🔹 Écoute temps réel des solidaires
   useEffect(() => {
@@ -84,63 +105,93 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // 🔹 Mise à jour de la position dans Firestore
+  // 🔹 Mise à jour de la position
   useEffect(() => {
     if (user && currentPosition) {
-      setDoc(doc(db, "solidaires", user.uid), {
-        uid: user.uid,
-        name: user.email,
-        latitude: currentPosition[0],
-        longitude: currentPosition[1],
-        materiel: user.materiel || "pinces",
-      });
+      setDoc(
+        doc(db, "solidaires", user.uid),
+        {
+          uid: user.uid,
+          name: user.email,
+          latitude: currentPosition[0],
+          longitude: currentPosition[1],
+          materiel: user.materiel || "pinces",
+        },
+        { merge: true }
+      );
     }
   }, [currentPosition, user]);
 
-  // 🔹 Supprimer utilisateur Firestore à la déconnexion
-  useEffect(() => {
-    return () => {
-      if (user) deleteDoc(doc(db, "solidaires", user.uid));
-    };
-  }, [user]);
+  // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
+const filteredSolidaires = activeReport
+  ? solidaires.filter(
+      (s) =>
+        s.materiel &&
+        activeReport.nature &&
+        s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
+    )
+  : [];
 
-  // 🔹 Filtrage des solidaires selon le matériel requis par la panne active
-  const filteredSolidaires = activeReport
-    ? solidaires.filter(
-        (s) =>
-          s.materiel &&
-          activeReport.nature &&
-          s.materiel.toLowerCase() === activeReport.nature.toLowerCase()
-      )
-    : [];
+  // 🔹 Fonction pour alerter un solidaire
+  const onAlertUser = async (solidaire) => {
+    if (!activeReport || !user) return;
+    try {
+      await addDoc(collection(db, "alertes"), {
+        fromUid: user.uid,
+        toUid: solidaire.uid,
+        reportId: activeReport.id,
+        status: "envoyée",
+        timestamp: serverTimestamp(),
+      });
 
-  console.log("Panne active :", activeReport);
-  console.log("Solidaires filtrés :", filteredSolidaires);
+      await updateDoc(doc(db, "reports", activeReport.id), {
+        status: "aide en cours",
+        helperUid: solidaire.uid,
+      });
+
+      toast.success(`✅ Alerte envoyée à ${solidaire.name} !`);
+    } catch (err) {
+      console.error("Erreur alerte :", err);
+      toast.error("⚠️ Impossible d'envoyer l'alerte.");
+    }
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "20px",
+        padding: "20px",
+      }}
+    >
+      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
+
+      {user && <AlertsListener user={user} />}
+
       {!user ? (
         <Auth setUser={setUser} />
       ) : (
         <>
           <h2>Bienvenue {user.email}</h2>
 
-          {/* Bouton pour ajouter utilisateurs fictifs */}
           <button onClick={createFakeUsers}>👤 Ajouter utilisateurs fictifs</button>
 
-          {/* Carte */}
           <MapView
-            reports={reports}
-            solidaires={filteredSolidaires}
-            userPosition={currentPosition}
-            onPositionChange={setCurrentPosition}
-            onReportClick={setActiveReport}
-          />
+  reports={reports}
+  solidaires={filteredSolidaires}
+  userPosition={currentPosition}
+  onPositionChange={setCurrentPosition}
+  onReportClick={setActiveReport}
+  onAlertUser={onAlertUser}
+  activeReport={activeReport}
+/>
 
-          {/* Formulaire de signalement */}
+
+
           <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
 
-          {/* Chat pour la panne active */}
           {activeReport && <Chat report={activeReport} user={user} />}
         </>
       )}
