@@ -25,8 +25,8 @@ const solidaireIcon = new L.Icon({
 });
 
 const solidaireAlertedIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
-  iconSize: [28, 28],
+  iconUrl: "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000",
+  iconSize: [40, 40],
 });
 
 const solidaireHighlightIcon = new L.Icon({
