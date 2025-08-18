@@ -59,43 +59,58 @@ export default function App() {
     }
   }, []);
 
+  // 🔹 Création de solidaires fictifs (une seule fois)
   const createFakeUsers = async () => {
   const fakeUsers = [
-    { uid: "fake-1", name: "Paul", latitude: 48.8566, longitude: 2.3522, materiel: "batterie" },
-    { uid: "fake-2", name: "Sophie", latitude: 45.7640, longitude: 4.8357, materiel: "pneu" },
-    { uid: "fake-3", name: "Karim", latitude: 43.6045, longitude: 1.4440, materiel: "carburant" },
-    { uid: "fake-4", name: "Julie", latitude: 43.2965, longitude: 5.3698, materiel: "batterie" },
-    { uid: "fake-5", name: "Marc", latitude: 49.2583, longitude: 4.0317, materiel: "pneu" },
+    { uid: "fake1", name: "Alice", latitude: 43.493, longitude: -1.475, materiel: "batterie" },
+    { uid: "fake2", name: "Bob", latitude: 43.491, longitude: -1.476, materiel: "pneu" },
+    { uid: "fake3", name: "Charlie", latitude: 43.492, longitude: -1.474, materiel: "carburant" },
+    { uid: "fake4", name: "David", latitude: 48.8566, longitude: 2.3522, materiel: "huile" },
+    { uid: "fake5", name: "Emma", latitude: 45.7640, longitude: 4.8357, materiel: "clé" },
+    { uid: "fake6", name: "Fiona", latitude: 43.2965, longitude: 5.3698, materiel: "tournevis" },
+    { uid: "fake7", name: "George", latitude: 43.6047, longitude: 1.4442, materiel: "pinces" },
+    { uid: "fake8", name: "Hannah", latitude: 43.7102, longitude: 7.2620, materiel: "batterie" },
+    { uid: "fake9", name: "Ian", latitude: 47.2184, longitude: -1.5536, materiel: "pneu" },
+    { uid: "fake10", name: "Julia", latitude: 48.5734, longitude: 7.7521, materiel: "carburant" },
+    { uid: "fake11", name: "Kevin", latitude: 43.6108, longitude: 3.8767, materiel: "huile" },
+    { uid: "fake12", name: "Laura", latitude: 48.1173, longitude: -1.6778, materiel: "clé" },
+    { uid: "fake13", name: "Mike", latitude: 45.1885, longitude: 5.7245, materiel: "tournevis" },
+    { uid: "fake14", name: "Nina", latitude: 47.3220, longitude: 5.0415, materiel: "pinces" },
+    { uid: "fake15", name: "Oscar", latitude: 45.7772, longitude: 3.0870, materiel: "batterie" },
   ];
 
   for (const u of fakeUsers) {
-    const docRef = doc(db, "solidaires", u.uid);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      await setDoc(docRef, u);
+    try {
+      const userDoc = await getDoc(doc(db, "solidaires", u.uid));
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, "solidaires", u.uid), u);
+      }
+    } catch (err) {
+      console.error("Erreur création user fictif :", err);
     }
   }
-  toast.success("✅ Utilisateurs fictifs ajoutés !");
 };
 
+  useEffect(() => {
+    createFakeUsers();
+  }, []);
 
-const handleNewReport = async (newReport) => {
-  try {
-    const docRef = await addDoc(collection(db, "reports"), {
-      ...newReport,
-      status: "en attente",
-      timestamp: serverTimestamp(),
-    });
+  const handleNewReport = async (newReport) => {
+    try {
+      const docRef = await addDoc(collection(db, "reports"), {
+        ...newReport,
+        status: "en attente",
+        timestamp: serverTimestamp(),
+      });
 
-    const reportWithId = { ...newReport, id: docRef.id };
-    setReports([...reports, reportWithId]);
-    setActiveReport(reportWithId);
-  } catch (err) {
-    console.error("Erreur création report :", err);
-    alert("⚠️ Impossible de créer le rapport.");
-  }
-};
-
+      const reportWithId = { ...newReport, id: docRef.id };
+      setReports([...reports, reportWithId]);
+      setActiveReport(reportWithId);
+    } catch (err) {
+      console.error("Erreur création report :", err);
+      alert("⚠️ Impossible de créer le rapport.");
+    }
+  };
 
   // 🔹 Écoute temps réel des solidaires
   useEffect(() => {
@@ -122,9 +137,16 @@ const handleNewReport = async (newReport) => {
     }
   }, [currentPosition, user]);
 
-  // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
+    // 🔹 Filtrage des solidaires : ne montrer que ceux pouvant répondre à la panne active
 const filteredSolidaires = activeReport
-  ? solidaires.filter(
+  ? solidaires.map((s) => {
+      // Vérifier si ce solidaire a déjà été alerté
+      const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+      return {
+        ...s,
+        alreadyAlerted,
+      };
+    }).filter(
       (s) =>
         s.materiel &&
         activeReport.nature &&
@@ -132,29 +154,46 @@ const filteredSolidaires = activeReport
     )
   : [];
 
+
   // 🔹 Fonction pour alerter un solidaire
-  const onAlertUser = async (solidaire) => {
-    if (!activeReport || !user) return;
-    try {
-      await addDoc(collection(db, "alertes"), {
-        fromUid: user.uid,
-        toUid: solidaire.uid,
-        reportId: activeReport.id,
-        status: "envoyée",
-        timestamp: serverTimestamp(),
-      });
+const onAlertUser = async (solidaire) => {
+  if (!activeReport || !user) return;
+  try {
+    await addDoc(collection(db, "alertes"), {
+      fromUid: user.uid,
+      toUid: solidaire.uid,
+      reportId: activeReport.id,
+      status: "envoyée",
+      timestamp: serverTimestamp(),
+    });
 
-      await updateDoc(doc(db, "reports", activeReport.id), {
-        status: "aide en cours",
-        helperUid: solidaire.uid,
-      });
+    await updateDoc(doc(db, "reports", activeReport.id), {
+      status: "aide en cours",
+      helperUid: solidaire.uid,
+    });
 
-      toast.success(`✅ Alerte envoyée à ${solidaire.name} !`);
-    } catch (err) {
-      console.error("Erreur alerte :", err);
-      toast.error("⚠️ Impossible d'envoyer l'alerte.");
-    }
-  };
+    // ✅ Mise à jour immédiate du state local pour refléter l’alerte
+    setActiveReport((prev) =>
+      prev && prev.id === activeReport.id
+        ? { ...prev, status: "aide en cours", helperUid: solidaire.uid }
+        : prev
+    );
+    setReports((prev) =>
+      prev.map((r) =>
+        r.id === activeReport.id
+          ? { ...r, status: "aide en cours", helperUid: solidaire.uid }
+          : r
+      )
+    );
+
+    toast.success(`✅ Alerte envoyée à ${solidaire.name} !`);
+  } catch (err) {
+    console.error("Erreur alerte :", err);
+    toast.error("⚠️ Impossible d'envoyer l'alerte.");
+  }
+};
+
+
 
   return (
     <div
@@ -176,19 +215,15 @@ const filteredSolidaires = activeReport
         <>
           <h2>Bienvenue {user.email}</h2>
 
-          <button onClick={createFakeUsers}>👤 Ajouter utilisateurs fictifs</button>
-
           <MapView
-  reports={reports}
-  solidaires={filteredSolidaires}
-  userPosition={currentPosition}
-  onPositionChange={setCurrentPosition}
-  onReportClick={setActiveReport}
-  onAlertUser={onAlertUser}
-  activeReport={activeReport}
-/>
-
-
+            reports={reports}
+            solidaires={filteredSolidaires}
+            userPosition={currentPosition}
+            onPositionChange={setCurrentPosition}
+            onReportClick={setActiveReport}
+            onAlertUser={onAlertUser}
+            activeReport={activeReport}
+          />
 
           <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
 
