@@ -1,5 +1,5 @@
 import React from "react";
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -19,14 +19,36 @@ const solidaireIcon = new L.Icon({
   iconSize: [25, 25],
 });
 
+const alertedIcon = new L.Icon({
+  // icône différente pour les solidaires déjà alertés
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
+  iconSize: [28, 28],
+});
+
+const loadingIcon = new L.Icon({
+  iconUrl: "https://i.gifer.com/ZZ5H.gif", // petit spinner animé
+  iconSize: [30, 30],
+});
+
+const waitingIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/271/271203.png", // trois points horizontaux
+  iconSize: [30, 30],
+});
+
+const phoneIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/597/597177.png", // 📞 téléphone
+  iconSize: [28, 28],
+});
+
+
+
 export default function MapView({
   reports,
   solidaires,
   userPosition,
-  onPositionChange,
   onReportClick,
   onAlertUser,
-  activeReport, // <-- ajouté
+  activeReport,
 }) {
   if (!userPosition) return <div>📍 Localisation en cours...</div>;
 
@@ -70,31 +92,34 @@ export default function MapView({
       ))}
 
       {/* Marqueurs des solidaires filtrés */}
-{solidaires.map((s) => (
-  <Marker
-    key={s.uid}
-    position={[s.latitude, s.longitude]}
-    icon={solidaireIcon}
-  >
-    <Popup>
-      <strong>👤 {s.name}</strong> <br />
-      Matériel : {s.materiel} <br />
-      {activeReport && activeReport.helperUid === s.uid ? (
-        <span style={{ color: "orange", fontWeight: "bold" }}>
-          ⚠️ Déjà alerté – réponse en attente
-        </span>
-      ) : (
-        <button
-          style={{ marginTop: "5px", cursor: "pointer" }}
-          onClick={() => onAlertUser(s)}
-        >
-          ⚡ Alerter
-        </button>
-      )}
-    </Popup>
-  </Marker>
-))}
+      {solidaires.map((s) => {
+        const isAlerted = !!(activeReport && activeReport.helperUid === s.uid);
 
+        return (
+          <Marker
+            key={`${s.uid}-${isAlerted ? "alerted" : "idle"}`}
+            position={[s.latitude, s.longitude]}
+            icon={isAlerted ? phoneIcon : solidaireIcon} // 🔹 téléphone si alerté
+          >
+            <Popup>
+              <strong>👤 {s.name}</strong> <br />
+              Matériel : {s.materiel} <br />
+              {isAlerted ? (
+                <span style={{ color: "orange", fontWeight: "bold" }}>
+                  📞 Déjà contacté – en attente de réponse
+                </span>
+              ) : (
+                <button
+                  style={{ marginTop: "5px", cursor: "pointer" }}
+                  onClick={() => onAlertUser(s)}
+                >
+                  ⚡ Alerter
+                </button>
+              )}
+            </Popup>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }
