@@ -13,24 +13,9 @@ const currentUserIcon = new L.Icon({
   className: "current-user-icon",
 });
 
-const otherUserIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1077/1077035.png",
-  iconSize: [25, 25],
-});
-
 const reportIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/564/564619.png",
   iconSize: [25, 25],
-});
-
-const solidaireIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/565/565547.png",
-  iconSize: [30, 30],
-});
-
-const solidaireAlertedIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1828/1828844.png",
-  iconSize: [40, 40],
 });
 
 const solidaireHighlightIcon = new L.Icon({
@@ -62,6 +47,55 @@ function FlyToLocation({ alert }) {
   return null;
 }
 
+// 🔹 Nouvelle fonction d'icône avec badge
+const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
+  let baseIconUrl;
+  switch (status) {
+    case "alerted":
+      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/1828/1828844.png";
+      break;
+    case "confirmed":
+      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/190/190411.png";
+      break;
+    default:
+      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/565/565547.png";
+  }
+
+  if (!pendingAlertsCount) {
+    return new L.Icon({
+      iconUrl: baseIconUrl,
+      iconSize: [30, 30],
+    });
+  }
+
+  return L.divIcon({
+    className: "solidaire-badge-icon",
+    html: `
+      <div style="position: relative; display: inline-block;">
+        <img src="${baseIconUrl}" style="width:30px;height:30px;"/>
+        <span style="
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          background: red;
+          color: white;
+          font-size: 12px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        ">
+          ${pendingAlertsCount}
+        </span>
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+};
+
 export default function MapView({
   reports,
   solidaires,
@@ -84,7 +118,6 @@ export default function MapView({
         cancelReport(activeReport.id); // ferme la popup
       } else {
         const data = docSnap.data();
-        // Met à jour le statut si différent
         if (data.status !== activeReport.status) {
           onReportClick({ ...activeReport, status: data.status, helperUid: data.helperUid });
         }
@@ -93,21 +126,6 @@ export default function MapView({
 
     return () => unsub();
   }, [activeReport, cancelReport, onReportClick]);
-
-  const getIconByStatus = (status) => {
-    switch (status) {
-      case "relevant":
-        return solidaireHighlightIcon;
-      case "alerted":
-        return solidaireAlertedIcon;
-      case "irrelevant":
-        return solidaireIcon;
-      case "confirmed":
-        return solidaireHighlightIcon;
-      default:
-        return solidaireIcon;
-    }
-  };
 
   // 🔹 Filtrage sécurisé des solidaires
   const filteredSolidaires = solidaires.filter(
@@ -197,8 +215,18 @@ export default function MapView({
           status =
             activeReport.status === "aide confirmée" ? "confirmed" : "alerted";
         }
+
+        // 🔹 Calcul du nombre d’alertes en attente
+        const pendingAlertsCount = reports.filter(
+          (r) => r.helperUid === s.uid && r.status !== "aide confirmée"
+        ).length;
+
         return (
-          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getIconByStatus(status)}>
+          <Marker
+            key={s.uid}
+            position={[s.latitude, s.longitude]}
+            icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
+          >
             <Popup>
               <strong>👤 {s.name}</strong> <br />
               Matériel : {s.materiel} <br />
