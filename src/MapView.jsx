@@ -79,7 +79,7 @@ export default function MapView({
 
     const unsub = onSnapshot(doc(db, "reports", activeReport.id), (docSnap) => {
       if (!docSnap.exists()) {
-        toast.info("🗑️ La panne que vous aidiez a été annulée !");
+        toast.info("🗑️ La demande de dépannage a été annulée.");
       }
     });
 
