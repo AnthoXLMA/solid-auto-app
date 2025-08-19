@@ -4,16 +4,13 @@ import MapView from "./MapView";
 import ReportForm from "./ReportForm";
 import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
-
-
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
-
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 import useReportsListener from "./useReportsListener";
+
 
 export default function App() {
   // 🔹 States
@@ -192,6 +189,25 @@ export default function App() {
 
   const [selectedAlert, setSelectedAlert] = useState(null);
 
+// reportId = ID de la panne à annuler
+const cancelReport = async (reportId) => {
+  try {
+    // Supprimer la panne dans Firestore
+    await deleteDoc(doc(db, "reports", reportId));
+
+    // Réinitialiser l'état local pour réafficher la carte sans ce marker
+    setReports(prevReports => prevReports.filter(r => r.id !== reportId));
+
+    // Réinitialiser éventuellement l'état des solidaires actifs
+    setActiveReport(null);
+
+    window.alert("🗑️ Votre demande de panne a été annulée !");
+  } catch (err) {
+    console.error("Erreur lors de l'annulation :", err);
+    window.alert("❌ Impossible d'annuler la panne pour le moment.");
+  }
+};
+
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
@@ -214,8 +230,7 @@ export default function App() {
               </li>
             ))}
           </ul>
-
-          <MapView
+<MapView
   reports={reports}
   solidaires={filteredSolidaires}
   userPosition={currentPosition}
@@ -223,8 +238,11 @@ export default function App() {
   onReportClick={setActiveReport}
   onAlertUser={onAlertUser}
   activeReport={activeReport}
-  selectedAlert={selectedAlert}   // 👈 nouveau
+  selectedAlert={selectedAlert}
+  cancelReport={cancelReport}   // 👈 ajouter cette ligne
 />
+
+
 
 
           <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
