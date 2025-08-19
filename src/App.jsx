@@ -5,6 +5,7 @@ import ReportForm from "./ReportForm";
 import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
 
+
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -189,11 +190,15 @@ export default function App() {
     }
   };
 
+  const [selectedAlert, setSelectedAlert] = useState(null);
+
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
 
-      {user && <AlertsListener user={user} />}
+      {user && <AlertsListener user={user} setSelectedAlert={setSelectedAlert} />}
+
 
       {!user ? (
         <Auth setUser={setUser} />
@@ -211,14 +216,16 @@ export default function App() {
           </ul>
 
           <MapView
-            reports={reports}
-            solidaires={filteredSolidaires}
-            userPosition={currentPosition}
-            onPositionChange={setCurrentPosition}
-            onReportClick={setActiveReport}
-            onAlertUser={onAlertUser}
-            activeReport={activeReport}
-          />
+  reports={reports}
+  solidaires={filteredSolidaires}
+  userPosition={currentPosition}
+  onPositionChange={setCurrentPosition}
+  onReportClick={setActiveReport}
+  onAlertUser={onAlertUser}
+  activeReport={activeReport}
+  selectedAlert={selectedAlert}   // 👈 nouveau
+/>
+
 
           <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
 
