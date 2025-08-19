@@ -134,6 +134,7 @@ function FlyToLocation({ alert }) {
     const { latitude, longitude } = alert;
     if (typeof latitude !== "number" || typeof longitude !== "number") return;
     map.flyTo([latitude, longitude], 15, { animate: true });
+    toast.info("📍 Zoom sur la panne sélectionnée");
   }, [alert, map]);
   return null;
 }
@@ -183,6 +184,7 @@ export default function MapView({
       } else {
         const data = docSnap.data();
         if (data.status !== activeReport.status) {
+          toast.info(`ℹ️ Le statut de la panne "${activeReport.nature}" a changé : ${data.status}`);
           onReportClick({
             ...activeReport,
             status: data.status,
@@ -251,12 +253,17 @@ export default function MapView({
             key={report.id}
             position={[report.latitude, report.longitude]}
             icon={reportIcon}
-            eventHandlers={{ click: () => onReportClick(report) }}
+            eventHandlers={{
+              click: () => {
+                onReportClick(report);
+                toast.info(`⚠️ Panne sélectionnée : ${report.nature}`);
+              },
+            }}
           >
             <Popup>
               <strong>⚠️ Panne :</strong> {report.nature} <br />
               <button onClick={() => onReportClick(report)}>🔍 Voir détails</button>
-              <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
+              <button onClick={() => { cancelReport(report.id); toast.info("❌ Panne annulée"); }}>❌ Annuler</button>
             </Popup>
           </Marker>
         ))}
@@ -301,7 +308,7 @@ export default function MapView({
                 {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà alerté</span>}
                 {status === "confirmed" && <span style={{ color: "green" }}>✅ Aide confirmée</span>}
                 {status === "relevant" && s.uid !== currentUserUid && (
-                  <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+                  <button onClick={() => { onAlertUser(s); toast.success(`⚡ Alerte envoyée à ${s.name}`); }}>⚡ Alerter</button>
                 )}
               </Popup>
             </Marker>
