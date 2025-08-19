@@ -115,7 +115,7 @@ export default function MapView({
     const unsub = onSnapshot(reportRef, (docSnap) => {
       if (!docSnap.exists()) {
         toast.info("🗑️ La demande de dépannage a été annulée.");
-        cancelReport(activeReport.id);
+        cancelReport(activeReport.id); // ferme la popup
       } else {
         const data = docSnap.data();
         if (data.status !== activeReport.status) {
@@ -129,7 +129,13 @@ export default function MapView({
 
   // 🔹 Filtrage sécurisé des solidaires
   const filteredSolidaires = solidaires.filter(
-    (s) => s.uid && s.uid !== currentUserUid
+    (s) =>
+      s.uid &&
+      s.uid !== currentUserUid &&
+      (!activeReport ||
+        (s.materiel &&
+          activeReport.nature &&
+          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())))
   );
 
   // 🔹 Calcul sécurisé des coordonnées pour FlyToLocation
@@ -203,18 +209,17 @@ export default function MapView({
       ))}
 
       {/* Marqueurs des solidaires */}
-      {solidaires.map((s) => {
+      {filteredSolidaires.map((s) => {
         let status = "relevant";
         if (activeReport && activeReport.helperUid === s.uid) {
           status =
             activeReport.status === "aide confirmée" ? "confirmed" : "alerted";
         }
 
-        // 🔹 Badge rouge uniquement pour le solidaire connecté
-        const pendingAlertsCount =
-          s.uid === currentUserUid
-            ? reports.filter((r) => r.helperUid === s.uid && r.status !== "aide confirmée").length
-            : 0;
+        // 🔹 Calcul du nombre d’alertes en attente
+        const pendingAlertsCount = reports.filter(
+          (r) => r.helperUid === s.uid && r.status !== "aide confirmée"
+        ).length;
 
         return (
           <Marker
@@ -235,7 +240,7 @@ export default function MapView({
                   ✅ Aide confirmée !
                 </span>
               )}
-              {status === "relevant" && s.uid === currentUserUid && (
+              {status === "relevant" && (
                 <button
                   style={{ marginTop: "5px", cursor: "pointer" }}
                   onClick={() => onAlertUser(s)}
