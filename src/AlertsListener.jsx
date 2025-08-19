@@ -3,7 +3,8 @@ import { collection, onSnapshot, query, where, doc, updateDoc } from "firebase/f
 import { db } from "./firebase";
 import "./AlertsListener.css"; // fichier CSS pour l'animation
 
-export default function AlertsListener({ user }) {
+
+export default function AlertsListener({ user, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
 
@@ -72,6 +73,10 @@ export default function AlertsListener({ user }) {
               style={{ marginBottom: "8px", transition: "opacity 0.3s" }}
             >
               🚨 {a.fromUid} vous demande de l’aide (report: {a.reportId})
+              <button onClick={() => setSelectedAlert(a)}>
+                📍 Géolocaliser l’alerte
+              </button>
+
               <button
                 style={{ marginLeft: "10px", cursor: "pointer" }}
                 onClick={() => acceptAlert(a)}
