@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { collection, query, where, orderBy, addDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
-import { db } from "./firebase"; // Assure-toi d’importer ton db Firebase
+import { db } from "./firebase";
 
 export default function Chat({ report, user }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
 
   useEffect(() => {
-    if (!report) return;
+    if (!report) return; // ne fait rien si report est undefined
 
     const messagesRef = collection(db, "messages");
     const q = query(
       messagesRef,
-      where("reportId", "==", report.id), // filtrer par panne
-      orderBy("timestamp", "asc")         // trier par timestamp
+      where("reportId", "==", report.id),
+      orderBy("timestamp", "asc")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -25,7 +25,7 @@ export default function Chat({ report, user }) {
   }, [report]);
 
   const handleSend = async () => {
-    if (newMessage.trim() === "") return;
+    if (!report || newMessage.trim() === "") return;
 
     try {
       await addDoc(collection(db, "messages"), {
@@ -41,9 +41,13 @@ export default function Chat({ report, user }) {
     }
   };
 
+  if (!report) {
+    return <div>Sélectionnez un rapport pour voir le chat.</div>; // fallback si pas de report
+  }
+
   return (
     <div style={{ border: "1px solid #ccc", padding: "10px", width: "100%", maxWidth: "500px" }}>
-      <h3>Chat pour la panne: {report.nature}</h3>
+      <h3>Chat pour la panne: {report.nature || "inconnue"}</h3>
       <div style={{ maxHeight: "300px", overflowY: "auto", marginBottom: "10px" }}>
         {messages.map(msg => (
           <div key={msg.id} style={{ margin: "5px 0", padding: "5px", backgroundColor: msg.senderId === user.uid ? "#e0ffe0" : "#f0f0f0" }}>
