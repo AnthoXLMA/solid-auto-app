@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { onSnapshot, doc } from "firebase/firestore";
+import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 
@@ -21,16 +21,13 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   let baseIconUrl;
   switch (status) {
     case "alerted":
-      baseIconUrl =
-        "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000";
+      baseIconUrl = "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000";
       break;
     case "confirmed":
-      baseIconUrl =
-        "https://img.icons8.com/?size=100&id=63227&format=png&color=000000";
+      baseIconUrl = "https://img.icons8.com/?size=100&id=63227&format=png&color=000000";
       break;
     default:
-      baseIconUrl =
-        "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
+      baseIconUrl = "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
   }
 
   if (!pendingAlertsCount) {
@@ -67,6 +64,43 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
     iconAnchor: [15, 15],
   });
 };
+
+// === Modal d’acceptation ===
+function AcceptModal({ isOpen, onClose, report, onConfirm }) {
+  if (!isOpen || !report) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+        <h2 className="text-lg font-bold mb-4">Confirmer le dépannage</h2>
+        <p className="mb-6">
+          Souhaitez-vous annuler les frais de dépannage pour la panne :{" "}
+          <strong>{report.nature}</strong> ?
+        </p>
+        <div className="flex justify-between">
+          <button
+            onClick={() => onConfirm("gratuit")}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+          >
+            Oui (Gratuit)
+          </button>
+          <button
+            onClick={() => onConfirm("5€")}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Non (5€)
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 text-sm text-gray-500 hover:underline"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // === Utilitaire distance (Haversine) ===
 function getDistanceKm(lat1, lon1, lat2, lon2) {
@@ -115,6 +149,28 @@ export default function MapView({
   selectedAlert,
   cancelReport,
 }) {
+  const [acceptModal, setAcceptModal] = useState({ isOpen: false, report: null });
+
+  const handleAcceptClick = (report) => {
+    setAcceptModal({ isOpen: true, report });
+  };
+
+  const handleConfirmPricing = async (pricing) => {
+    if (!acceptModal.report) return;
+
+    const reportRef = doc(db, "reports", acceptModal.report.id);
+    await updateDoc(reportRef, {
+      status: "aide confirmée",
+      pricing,
+    });
+
+    toast.success(
+      `✅ Votre aide a été confirmée. Le montant du dépannage sera : ${pricing}`
+    );
+
+    setAcceptModal({ isOpen: false, report: null });
+  };
+
   // Suivi temps réel du report actif
   useEffect(() => {
     if (!activeReport) return;
@@ -148,7 +204,6 @@ export default function MapView({
     }
   }
 
-  // Sécurité localisation
   if (
     !userPosition ||
     userPosition.length < 2 ||
@@ -158,112 +213,101 @@ export default function MapView({
     return <div>📍 Localisation en cours...</div>;
   }
 
-  // === Filtrage des solidaires ===
   const filteredSolidaires = activeReport
-    ? solidaires.filter((s) => {
-        // Exemple : vérifier si le solidaire possède le bon matériel
-        return (
-          !s.materiel ||
-          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
-        );
-      })
+    ? solidaires.filter((s) => !s.materiel || s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase()))
     : solidaires;
 
   return (
-    <MapContainer
-      center={userPosition}
-      zoom={13}
-      style={{ height: "500px", width: "100%" }}
-      scrollWheelZoom={true}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <>
+      <AcceptModal
+        isOpen={acceptModal.isOpen}
+        onClose={() => setAcceptModal({ isOpen: false, report: null })}
+        report={acceptModal.report}
+        onConfirm={handleConfirmPricing}
       />
 
-      <SetViewOnUser position={userPosition} />
-      {alertLocation && <FlyToLocation alert={alertLocation} />}
+      <MapContainer
+        center={userPosition}
+        zoom={13}
+        style={{ height: "500px", width: "100%" }}
+        scrollWheelZoom={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      {/* Utilisateur */}
-      <Marker position={userPosition} icon={currentUserIcon}>
-        <Popup>🙋‍♂️ Vous êtes ici</Popup>
-      </Marker>
+        <SetViewOnUser position={userPosition} />
+        {alertLocation && <FlyToLocation alert={alertLocation} />}
 
-      {/* Reports */}
-      {reports.map((report) => (
-        <Marker
-          key={report.id}
-          position={[report.latitude, report.longitude]}
-          icon={reportIcon}
-          eventHandlers={{ click: () => onReportClick(report) }}
-        >
-          <Popup>
-            <strong>⚠️ Panne :</strong> {report.nature} <br />
-            <button onClick={() => onReportClick(report)}>🔍 Voir détails</button>
-            <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
-          </Popup>
+        {/* Utilisateur */}
+        <Marker position={userPosition} icon={currentUserIcon}>
+          <Popup>🙋‍♂️ Vous êtes ici</Popup>
         </Marker>
-      ))}
 
-      {/* Solidaires filtrés */}
-      {filteredSolidaires.map((s) => {
-  let status = "relevant";
+        {/* Reports */}
+        {reports.map((report) => (
+          <Marker
+            key={report.id}
+            position={[report.latitude, report.longitude]}
+            icon={reportIcon}
+            eventHandlers={{ click: () => onReportClick(report) }}
+          >
+            <Popup>
+              <strong>⚠️ Panne :</strong> {report.nature} <br />
+              <button onClick={() => onReportClick(report)}>🔍 Voir détails</button>
+              <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
+            </Popup>
+          </Marker>
+        ))}
 
-  // 1️⃣ Vérifie si ce solidaire est concerné par un report
-  const reportForSolidaire = reports.find(
-    (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
-  );
+        {/* Solidaires filtrés */}
+        {filteredSolidaires.map((s) => {
+          let status = "relevant";
+          const reportForSolidaire = reports.find(
+            (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
+          );
 
-  if (reportForSolidaire) {
-    if (reportForSolidaire.status === "aide confirmée") {
-      status = "confirmed";
-    } else {
-      status = "alerted";
-    }
-  }
+          if (reportForSolidaire) {
+            status = reportForSolidaire.status === "aide confirmée" ? "confirmed" : "alerted";
+          }
 
-  // 2️⃣ Compte les alertes en attente (uniquement pour soi-même)
-  const pendingAlertsCount =
-    s.uid === currentUserUid
-      ? reports.filter(
-          (r) =>
-            r.helperUid === s.uid &&
-            !["aide confirmée", "annulé"].includes(r.status)
-        ).length
-      : 0;
+          const pendingAlertsCount =
+            s.uid === currentUserUid
+              ? reports.filter(
+                  (r) =>
+                    r.helperUid === s.uid &&
+                    !["aide confirmée", "annulé"].includes(r.status)
+                ).length
+              : 0;
 
-  // 3️⃣ Calcule la distance
-  const distance = getDistanceKm(
-    userPosition[0],
-    userPosition[1],
-    s.latitude,
-    s.longitude
-  );
+          const distance = getDistanceKm(
+            userPosition[0],
+            userPosition[1],
+            s.latitude,
+            s.longitude
+          );
 
-  return (
-    <Marker
-      key={s.uid}
-      position={[s.latitude, s.longitude]}
-      icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
-    >
-      <Popup>
-        <strong>👤 {s.name}</strong> <br />
-        Matériel : {s.materiel} <br />
-        📏 Distance : {distance} km <br />
-        {status === "alerted" && (
-          <span style={{ color: "orange" }}>📞 Déjà alerté</span>
-        )}
-        {status === "confirmed" && (
-          <span style={{ color: "green" }}>✅ Aide confirmée</span>
-        )}
-        {status === "relevant" && s.uid !== currentUserUid && (
-          <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
-        )}
-      </Popup>
-    </Marker>
-  );
-})}
-
-    </MapContainer>
+          return (
+            <Marker
+              key={s.uid}
+              position={[s.latitude, s.longitude]}
+              icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
+            >
+              <Popup>
+                <strong>👤 {s.name}</strong> <br />
+                Matériel : {s.materiel} <br />
+                📏 Distance : {distance} km <br />
+                {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà alerté</span>}
+                {status === "confirmed" && <span style={{ color: "green" }}>✅ Aide confirmée</span>}
+                {status === "relevant" && s.uid !== currentUserUid && (
+                  <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+                )}
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MapContainer>
+    </>
   );
 }
