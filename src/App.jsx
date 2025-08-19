@@ -10,6 +10,7 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverT
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import useReportsListener from "./useReportsListener";
+import UserReports from "./UserReports";
 
 
 export default function App() {
@@ -229,49 +230,43 @@ useEffect(() => {
   return () => unsub();
 }, [activeReport?.id]);
 
-
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
-      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
+<div className="min-h-screen flex flex-col">
 
-      {user && <AlertsListener user={user} setSelectedAlert={setSelectedAlert} />}
+  {/* Header */}
+  <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow">
+    <h1 className="text-xl font-bold">Bienvenue {user?.email}</h1>
+  </header>
 
+  {/* Contenu principal */}
+  <main className="flex flex-1 p-4 gap-4 bg-gray-50">
+    {/* Colonne gauche */}
+    <div className="flex-1 flex flex-col gap-4">
+      <div className="flex-1 bg-white rounded-xl shadow p-2">
+        <MapView
+          reports={reports}
+          solidaires={filteredSolidaires}
+          userPosition={currentPosition}
+          onPositionChange={setCurrentPosition}
+          onReportClick={setActiveReport}
+          onAlertUser={onAlertUser}
+          activeReport={activeReport}
+          selectedAlert={selectedAlert}
+          cancelReport={cancelReport}
+        />
+      </div>
 
-      {!user ? (
-        <Auth setUser={setUser} />
-      ) : (
-        <>
-          <h2>Bienvenue {user.email}</h2>
-
-          <h3>Mes demandes</h3>
-          <ul>
-            {userReports.map((r) => (
-              <li key={r.id}>
-                {r.description} - Status: {r.status}
-              </li>
-            ))}
-          </ul>
-<MapView
-  reports={reports}
-  solidaires={filteredSolidaires}
-  userPosition={currentPosition}
-  onPositionChange={setCurrentPosition}
-  onReportClick={setActiveReport}
-  onAlertUser={onAlertUser}
-  activeReport={activeReport}
-  selectedAlert={selectedAlert}
-  cancelReport={cancelReport}   // 👈 ajouter cette ligne
-/>
-
-
-
-
-          <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
-
-          {activeReport && <Chat report={activeReport} user={user} />}
-        </>
-      )}
+      <div className="bg-white rounded-xl shadow p-4">
+        <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
+      </div>
     </div>
+  </main>
+
+  {/* Footer */}
+  <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
+    © {new Date().getFullYear()} U-boto - Tous droits réservés
+  </footer>
+</div>
+
   );
 }
