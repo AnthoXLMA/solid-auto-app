@@ -259,6 +259,12 @@ useEffect(() => {
       <div className="bg-white rounded-xl shadow p-4">
         <ReportForm userPosition={currentPosition} onNewReport={handleNewReport} />
       </div>
+      {/* 🔔 AlertsListener doit rester actif pour l’utilisateur connecté */}
+    {user && (
+      <div className="bg-white rounded-xl shadow p-4">
+        <AlertsListener user={user} setSelectedAlert={setSelectedAlert} />
+      </div>
+    )}
     </div>
   </main>
 
