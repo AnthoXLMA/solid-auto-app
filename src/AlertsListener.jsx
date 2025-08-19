@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import "./AlertsListener.css"; // fichier CSS pour l'animation
-
 
 export default function AlertsListener({ user, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
@@ -47,12 +46,15 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
   const rejectAlert = async (alerte) => {
     try {
-      await updateDoc(doc(db, "alertes", alerte.id), { status: "refusé" });
+      // Supprime l'alerte dans Firestore
+      await deleteDoc(doc(db, "alertes", alerte.id));
+
+      // Optionnel : mettre à jour le report si nécessaire
       await updateDoc(doc(db, "reports", alerte.reportId), { status: "aide refusée" });
 
       removeAlertWithAnimation(alerte.id);
 
-      window.alert("❌ Vous avez refusé d’aider.");
+      window.alert("❌ Vous avez rejeté l’alerte.");
     } catch (err) {
       console.error("Erreur rejet :", err);
       window.alert("❌ Une erreur est survenue lors du rejet.");
