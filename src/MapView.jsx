@@ -8,63 +8,35 @@ import { db } from "./firebase";
 
 // Icônes
 const currentUserIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1946/1946429.png",
-  iconSize: [35, 35],
-  className: "current-user-icon",
+  iconUrl: "https://img.icons8.com/?size=100&id=fsoiqMUp0O4v&format=png&color=000000",
+  iconSize: [60, 60],
 });
 
 const reportIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/564/564619.png",
-  iconSize: [25, 25],
+  iconUrl: "https://img.icons8.com/?size=100&id=U12vJQsF1INo&format=png&color=000000",
+  iconSize: [45, 45],
 });
 
-const solidaireHighlightIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
-  iconSize: [30, 30],
-});
-
-// 🔹 Recentrage auto
-function SetViewOnUser({ position }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) map.setView(position, 15);
-  }, [position, map]);
-  return null;
-}
-
-// 🔹 FlyTo sécurisé
-function FlyToLocation({ alert }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!alert) return;
-    const { latitude, longitude } = alert;
-    if (typeof latitude !== "number" || typeof longitude !== "number") {
-      console.warn("FlyToLocation: coordonnées invalides détectées", alert);
-      return;
-    }
-    map.flyTo([latitude, longitude], 15, { animate: true });
-  }, [alert, map]);
-  return null;
-}
-
-// 🔹 Nouvelle fonction d'icône avec badge
 const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   let baseIconUrl;
   switch (status) {
     case "alerted":
-      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/1828/1828844.png";
+      baseIconUrl =
+        "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000";
       break;
     case "confirmed":
-      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/190/190411.png";
+      baseIconUrl =
+        "https://img.icons8.com/?size=100&id=63227&format=png&color=000000";
       break;
     default:
-      baseIconUrl = "https://cdn-icons-png.flaticon.com/512/565/565547.png";
+      baseIconUrl =
+        "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
   }
 
   if (!pendingAlertsCount) {
     return new L.Icon({
       iconUrl: baseIconUrl,
-      iconSize: [30, 30],
+      iconSize: [45, 45],
     });
   }
 
@@ -96,6 +68,42 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   });
 };
 
+// === Utilitaire distance (Haversine) ===
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // rayon Terre en km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(1); // distance en km arrondie à 0.1
+}
+
+// Recentrage
+function SetViewOnUser({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.setView(position, 15);
+  }, [position, map]);
+  return null;
+}
+
+// FlyTo
+function FlyToLocation({ alert }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!alert) return;
+    const { latitude, longitude } = alert;
+    if (typeof latitude !== "number" || typeof longitude !== "number") return;
+    map.flyTo([latitude, longitude], 15, { animate: true });
+  }, [alert, map]);
+  return null;
+}
+
 export default function MapView({
   reports,
   solidaires,
@@ -107,7 +115,7 @@ export default function MapView({
   selectedAlert,
   cancelReport,
 }) {
-  // 🔹 Synchronisation en temps réel de activeReport
+  // Suivi temps réel du report actif
   useEffect(() => {
     if (!activeReport) return;
 
@@ -115,11 +123,15 @@ export default function MapView({
     const unsub = onSnapshot(reportRef, (docSnap) => {
       if (!docSnap.exists()) {
         toast.info("🗑️ La demande de dépannage a été annulée.");
-        cancelReport(activeReport.id); // ferme la popup
+        cancelReport(activeReport.id);
       } else {
         const data = docSnap.data();
         if (data.status !== activeReport.status) {
-          onReportClick({ ...activeReport, status: data.status, helperUid: data.helperUid });
+          onReportClick({
+            ...activeReport,
+            status: data.status,
+            helperUid: data.helperUid,
+          });
         }
       }
     });
@@ -127,33 +139,35 @@ export default function MapView({
     return () => unsub();
   }, [activeReport, cancelReport, onReportClick]);
 
-  // 🔹 Filtrage sécurisé des solidaires
-  const filteredSolidaires = solidaires.filter(
-    (s) =>
-      s.uid &&
-      s.uid !== currentUserUid &&
-      (!activeReport ||
-        (s.materiel &&
-          activeReport.nature &&
-          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())))
-  );
-
-  // 🔹 Calcul sécurisé des coordonnées pour FlyToLocation
+  // FlyTo sur alerte
   let alertLocation = null;
   if (selectedAlert) {
     const report = reports.find((r) => r.id === selectedAlert.reportId);
-    if (report && report.latitude != null && report.longitude != null) {
+    if (report && report.latitude && report.longitude) {
       alertLocation = { latitude: report.latitude, longitude: report.longitude };
-    } else {
-      console.warn(
-        "FlyToLocation: coordonnées invalides ou report introuvable pour l'alerte",
-        selectedAlert
-      );
     }
   }
 
-  // 🔹 Rendu conditionnel si pas de localisation
-  if (!userPosition) return <div>📍 Localisation en cours...</div>;
+  // Sécurité localisation
+  if (
+    !userPosition ||
+    userPosition.length < 2 ||
+    userPosition[0] == null ||
+    userPosition[1] == null
+  ) {
+    return <div>📍 Localisation en cours...</div>;
+  }
+
+  // === Filtrage des solidaires ===
+  const filteredSolidaires = activeReport
+    ? solidaires.filter((s) => {
+        // Exemple : vérifier si le solidaire possède le bon matériel
+        return (
+          !s.materiel ||
+          s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase())
+        );
+      })
+    : solidaires;
 
   return (
     <MapContainer
@@ -167,16 +181,15 @@ export default function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Recentrage automatique */}
       <SetViewOnUser position={userPosition} />
       {alertLocation && <FlyToLocation alert={alertLocation} />}
 
-      {/* Marqueur utilisateur */}
+      {/* Utilisateur */}
       <Marker position={userPosition} icon={currentUserIcon}>
         <Popup>🙋‍♂️ Vous êtes ici</Popup>
       </Marker>
 
-      {/* Marqueurs des reports */}
+      {/* Reports */}
       {reports.map((report) => (
         <Marker
           key={report.id}
@@ -186,72 +199,71 @@ export default function MapView({
         >
           <Popup>
             <strong>⚠️ Panne :</strong> {report.nature} <br />
-            <button
-              style={{ marginTop: "5px", cursor: "pointer" }}
-              onClick={() => onReportClick(report)}
-            >
-              🔍 Voir détails
-            </button>
-            <button
-              style={{
-                marginTop: "5px",
-                marginLeft: "5px",
-                cursor: "pointer",
-                backgroundColor: "#f8d7da",
-                border: "none",
-              }}
-              onClick={() => cancelReport(report.id)}
-            >
-              ❌ Annuler la panne
-            </button>
+            <button onClick={() => onReportClick(report)}>🔍 Voir détails</button>
+            <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
           </Popup>
         </Marker>
       ))}
 
-      {/* Marqueurs des solidaires */}
+      {/* Solidaires filtrés */}
       {filteredSolidaires.map((s) => {
-        let status = "relevant";
-        if (activeReport && activeReport.helperUid === s.uid) {
-          status =
-            activeReport.status === "aide confirmée" ? "confirmed" : "alerted";
-        }
+  let status = "relevant";
 
-        // 🔹 Calcul du nombre d’alertes en attente
-        const pendingAlertsCount = reports.filter(
-          (r) => r.helperUid === s.uid && r.status !== "aide confirmée"
-        ).length;
+  // 1️⃣ Vérifie si ce solidaire est concerné par un report
+  const reportForSolidaire = reports.find(
+    (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
+  );
 
-        return (
-          <Marker
-            key={s.uid}
-            position={[s.latitude, s.longitude]}
-            icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
-          >
-            <Popup>
-              <strong>👤 {s.name}</strong> <br />
-              Matériel : {s.materiel} <br />
-              {status === "alerted" && (
-                <span style={{ color: "orange", fontWeight: "bold" }}>
-                  📞 Déjà alerté – en attente
-                </span>
-              )}
-              {status === "confirmed" && (
-                <span style={{ color: "green", fontWeight: "bold" }}>
-                  ✅ Aide confirmée !
-                </span>
-              )}
-              {status === "relevant" && (
-                <button
-                  style={{ marginTop: "5px", cursor: "pointer" }}
-                  onClick={() => onAlertUser(s)}
-                >
-                  ⚡ Alerter
-                </button>
-              )}
-            </Popup>
-          </Marker>
-        );
-      })}
+  if (reportForSolidaire) {
+    if (reportForSolidaire.status === "aide confirmée") {
+      status = "confirmed";
+    } else {
+      status = "alerted";
+    }
+  }
+
+  // 2️⃣ Compte les alertes en attente (uniquement pour soi-même)
+  const pendingAlertsCount =
+    s.uid === currentUserUid
+      ? reports.filter(
+          (r) =>
+            r.helperUid === s.uid &&
+            !["aide confirmée", "annulé"].includes(r.status)
+        ).length
+      : 0;
+
+  // 3️⃣ Calcule la distance
+  const distance = getDistanceKm(
+    userPosition[0],
+    userPosition[1],
+    s.latitude,
+    s.longitude
+  );
+
+  return (
+    <Marker
+      key={s.uid}
+      position={[s.latitude, s.longitude]}
+      icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
+    >
+      <Popup>
+        <strong>👤 {s.name}</strong> <br />
+        Matériel : {s.materiel} <br />
+        📏 Distance : {distance} km <br />
+        {status === "alerted" && (
+          <span style={{ color: "orange" }}>📞 Déjà alerté</span>
+        )}
+        {status === "confirmed" && (
+          <span style={{ color: "green" }}>✅ Aide confirmée</span>
+        )}
+        {status === "relevant" && s.uid !== currentUserUid && (
+          <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+        )}
+      </Popup>
+    </Marker>
+  );
+})}
+
     </MapContainer>
   );
 }
