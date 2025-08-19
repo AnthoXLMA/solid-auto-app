@@ -73,18 +73,26 @@ export default function MapView({
   selectedAlert,
   cancelReport,
 }) {
-  // 🔹 Toast notification si le report suivi est annulé
+  // 🔹 Synchronisation en temps réel de activeReport
   useEffect(() => {
     if (!activeReport) return;
 
-    const unsub = onSnapshot(doc(db, "reports", activeReport.id), (docSnap) => {
+    const reportRef = doc(db, "reports", activeReport.id);
+    const unsub = onSnapshot(reportRef, (docSnap) => {
       if (!docSnap.exists()) {
         toast.info("🗑️ La demande de dépannage a été annulée.");
+        cancelReport(activeReport.id); // ferme la popup
+      } else {
+        const data = docSnap.data();
+        // Met à jour le statut si différent
+        if (data.status !== activeReport.status) {
+          onReportClick({ ...activeReport, status: data.status, helperUid: data.helperUid });
+        }
       }
     });
 
     return () => unsub();
-  }, [activeReport]);
+  }, [activeReport, cancelReport, onReportClick]);
 
   const getIconByStatus = (status) => {
     switch (status) {

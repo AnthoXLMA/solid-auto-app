@@ -208,6 +208,28 @@ const cancelReport = async (reportId) => {
   }
 };
 
+// 🔹 Surveille le report actif en temps réel
+useEffect(() => {
+  if (!activeReport) return;
+
+  const unsub = onSnapshot(doc(db, "reports", activeReport.id), (docSnap) => {
+    if (!docSnap.exists()) {
+      toast.info("🗑️ La demande de dépannage a été annulée ou rejetée.");
+      setActiveReport(null);  // 🔹 reset l'activeReport pour la MapView
+      setReports(prev => prev.filter(r => r.id !== activeReport.id));
+    } else {
+      const data = docSnap.data();
+      setActiveReport(prev => ({ ...prev, ...data })); // 🔹 met à jour status/helperUid
+      setReports(prev =>
+        prev.map(r => (r.id === data.id ? { ...r, ...data } : r))
+      );
+    }
+  });
+
+  return () => unsub();
+}, [activeReport?.id]);
+
+
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", padding: "20px" }}>
