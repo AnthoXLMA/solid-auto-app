@@ -6,7 +6,7 @@ import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, addDoc, serverTimestamp, updateDoc, query, where } from "firebase/firestore";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import useReportsListener from "./useReportsListener";
@@ -67,6 +67,25 @@ export default function App() {
     createFakeUsers();
   }, []);
 
+  const [alerts, setAlerts] = useState([]);
+
+useEffect(() => {
+  if (!user) return;
+
+  const q = query(
+    collection(db, "alertes"),
+    where("toUid", "==", user.uid)
+  );
+
+  const unsub = onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    setAlerts(data);
+  });
+
+  return () => unsub();
+}, [user]);
+
+
   // Écoute solidaires en temps réel
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
@@ -115,19 +134,29 @@ export default function App() {
 
   // Filtrage solidaires pour report actif
   const filteredSolidaires = solidaires.map((s) => {
-    if (!activeReport) return { ...s, status: "normal" };
-    const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
-    const isRelevant =
-      s.materiel &&
-      activeReport.nature &&
-      s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+  if (!activeReport) return { ...s, status: "normal" };
 
-    return {
-      ...s,
-      alreadyAlerted,
-      status: alreadyAlerted ? "alerted" : isRelevant ? "relevant" : "irrelevant",
-    };
-  });
+  const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
+
+  const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+  const isRelevant =
+    s.materiel &&
+    activeReport.nature &&
+    s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+
+  let status = "irrelevant";
+  if (alreadyAlerted) status = "alerted";
+  else if (isRelevant) status = "relevant";
+  if (pendingAlertsCount > 0) status = "alerted"; // ✅ changement d'icône si alerte reçue
+
+  return {
+    ...s,
+    alreadyAlerted,
+    pendingAlertsCount,
+    status,
+  };
+});
+
 
   // Alerter un solidaire
   const onAlertUser = async (solidaire) => {
@@ -213,6 +242,7 @@ export default function App() {
             <MapView
               reports={reports}
               solidaires={filteredSolidaires}
+              alerts={alerts}   // <-- nouvelle prop
               userPosition={currentPosition}
               onPositionChange={setCurrentPosition}
               onReportClick={setActiveReport}
@@ -229,7 +259,11 @@ export default function App() {
 
           {user && (
             <div className="bg-white rounded-xl shadow p-4">
-              <AlertsListener user={user} setSelectedAlert={setSelectedAlert} />
+              <AlertsListener
+                user={user}
+                setSelectedAlert={setSelectedAlert}
+                userPosition={currentPosition}
+              />
             </div>
           )}
 

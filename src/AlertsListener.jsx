@@ -1,69 +1,125 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "./firebase";
 import "./AlertsListener.css"; // fichier CSS pour l'animation
+import AcceptModal from "./AcceptModal";
+import { toast } from "react-toastify";
 
 export default function AlertsListener({ user, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
+  const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
 
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, "alertes"),
-      where("toUid", "==", user.uid)
-    );
+    const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
 
     const unsub = onSnapshot(q, (snapshot) => {
-      setAlerts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => unsub();
   }, [user]);
 
   const removeAlertWithAnimation = (id) => {
-    setRemovingIds(prev => [...prev, id]);
+    setRemovingIds((prev) => [...prev, id]);
     setTimeout(() => {
-      setAlerts(prev => prev.filter(a => a.id !== id));
-      setRemovingIds(prev => prev.filter(rid => rid !== id));
-    }, 300); // correspond à la durée de l'animation CSS
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      setRemovingIds((prev) => prev.filter((rid) => rid !== id));
+    }, 300);
   };
 
+  // ✅ Accepter une alerte (ouvre le modal de calcul des frais)
   const acceptAlert = async (alerte) => {
     try {
-      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-      await updateDoc(doc(db, "reports", alerte.reportId), { status: "aide confirmée", helperUid: user.uid });
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
 
-      removeAlertWithAnimation(alerte.id);
+      if (!reportSnap.exists()) {
+        console.warn("⚠️ Report introuvable :", alerte.reportId);
+        await deleteDoc(doc(db, "alertes", alerte.id));
+        removeAlertWithAnimation(alerte.id);
+        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+        return;
+      }
 
-      window.alert("✅ Vous avez accepté d’aider !");
+      setAcceptModal({ isOpen: true, alerte });
     } catch (err) {
       console.error("Erreur acceptation :", err);
-      window.alert("❌ Une erreur est survenue lors de l’acceptation.");
+      toast.error("❌ Une erreur est survenue lors de l’acceptation.");
     }
   };
 
-  const rejectAlert = async (alerte) => {
+  // ✅ Confirmation depuis le modal (calcul + update Firestore)
+  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     try {
-      // Supprime l'alerte dans Firestore
-      await deleteDoc(doc(db, "alertes", alerte.id));
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
 
-      // Optionnel : mettre à jour le report si nécessaire
-      await updateDoc(doc(db, "reports", alerte.reportId), { status: "aide refusée" });
+      if (!reportSnap.exists()) {
+        console.warn("⚠️ Report introuvable :", alerte.reportId);
+        await deleteDoc(doc(db, "alertes", alerte.id));
+        removeAlertWithAnimation(alerte.id);
+        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+        return;
+      }
+
+      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+      await updateDoc(reportRef, {
+        status: "aide confirmée",
+        helperUid: user.uid,
+        frais: fraisAnnules ? 0 : montant,
+      });
 
       removeAlertWithAnimation(alerte.id);
+      setAcceptModal({ isOpen: false, alerte: null });
+      toast.success("✅ Vous avez accepté d’aider !");
+    } catch (err) {
+      console.error("Erreur pricing :", err);
+      toast.error("❌ Erreur lors du calcul des frais.");
+    }
+  };
 
-      window.alert("❌ Vous avez rejeté l’alerte.");
+  // ✅ Rejeter une alerte
+  const rejectAlert = async (alerte) => {
+    try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+
+      if (reportSnap.exists()) {
+        await updateDoc(reportRef, { status: "aide refusée" });
+      }
+
+      await deleteDoc(doc(db, "alertes", alerte.id));
+      removeAlertWithAnimation(alerte.id);
+      toast.info("❌ Vous avez rejeté l’alerte.");
     } catch (err) {
       console.error("Erreur rejet :", err);
-      window.alert("❌ Une erreur est survenue lors du rejet.");
+      toast.error("❌ Une erreur est survenue lors du rejet.");
     }
   };
 
   return (
     <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
       <h4>📢 Mes alertes reçues</h4>
+
+      <AcceptModal
+        isOpen={acceptModal.isOpen}
+        onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+        alerte={acceptModal.alerte}
+        onConfirm={handleConfirmPricing}
+      />
+
       {alerts.length === 0 ? (
         <p>Aucune alerte pour l’instant</p>
       ) : (
@@ -75,18 +131,22 @@ export default function AlertsListener({ user, setSelectedAlert }) {
               style={{ marginBottom: "8px", transition: "opacity 0.3s" }}
             >
               🚨 {a.fromUid} vous demande de l’aide (report: {a.reportId})
-              <button onClick={() => setSelectedAlert(a)}>
-                📍 Géolocaliser l’alerte
-              </button>
+              <button onClick={() => setSelectedAlert(a)}>📍 Géolocaliser</button>
 
               <button
-                style={{ marginLeft: "10px", cursor: "pointer" }}
+                style={{ marginLeft: "10px" }}
                 onClick={() => acceptAlert(a)}
               >
                 ✅ Proposer mon aide
               </button>
+
               <button
-                style={{ marginLeft: "5px", cursor: "pointer", backgroundColor: "#f8d7da", border: "none" }}
+                style={{
+                  marginLeft: "5px",
+                  cursor: "pointer",
+                  backgroundColor: "#f8d7da",
+                  border: "none",
+                }}
                 onClick={() => rejectAlert(a)}
               >
                 ❌ Rejeter
