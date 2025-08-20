@@ -245,7 +245,7 @@ export default function MapView({
                   Matériel : {s.materiel} <br />
                   📏 Distance : {distance} km <br />
                   {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà alerté</span>}
-                  {status === "busy" && <span style={{ color: "red" }}>⏳ Occupé</span>}
+                  {status === "busy" && <span style={{ color: "red" }}>⏳ Dépannage en Cours</span>}
                   {status === "relevant" && s.uid !== currentUserUid && (
                     <button
                       onClick={() => {
