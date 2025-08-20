@@ -109,8 +109,11 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
+  console.log("Modal ouvert ?", acceptModal);
+
   return (
     <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
+
       <h4>📢 Mes alertes reçues</h4>
 
       <AcceptModal
