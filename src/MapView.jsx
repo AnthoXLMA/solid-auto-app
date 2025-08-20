@@ -23,15 +23,15 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   switch (status) {
     case "alerted":
       baseIconUrl =
-        "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000"; // icône rouge
+        "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000"; // telephone vert
       break;
     case "confirmed": // déjà utilisé pour aide confirmée
       baseIconUrl =
-        "https://img.icons8.com/?size=100&id=63227&format=png&color=000000"; // icône verte
+        "https://img.icons8.com/?size=100&id=63227&format=png&color=000000"; // angel
       break;
     case "busy": // nouveau : occupé
       baseIconUrl =
-        "https://img.icons8.com/?size=100&id=59817&format=png&color=000000"; // sablier
+        "https://img.icons8.com/?size=100&id=59817&format=png&color=000000"; // point d'exclamation
       break;
     default:
       baseIconUrl =
@@ -60,55 +60,6 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
     iconAnchor: [18, 18],
   });
 };
-
-// === Modal d’acceptation ===
-// function AcceptModal({ isOpen, onClose, report, solidaire, onConfirm }) {
-//   if (!isOpen || !report || !solidaire) return null;
-
-//   const distance = getDistanceKm(
-//     solidaire.latitude,
-//     solidaire.longitude,
-//     report.latitude,
-//     report.longitude
-//   );
-
-//   const baseFare = distance * 0.5; // Exemple : 0.5€/km
-//   const finalFare = (baseFare * 1.2).toFixed(2); // +20%
-
-//   return (
-//     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-//       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-//         <h2 className="text-lg font-bold mb-4">Confirmer votre aide</h2>
-//         <p className="mb-6">
-//           Vous êtes à <strong>{distance} km</strong> du sinistré.
-//           <br />
-//           Les frais de dépannage sont estimés à :{" "}
-//           <strong>{finalFare} €</strong>
-//         </p>
-//         <div className="flex justify-between">
-//           <button
-//             onClick={() => onConfirm("payant", finalFare)}
-//             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-//           >
-//             Conserver les frais
-//           </button>
-//           <button
-//             onClick={() => onConfirm("gratuit", 0)}
-//             className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-//           >
-//             Annuler les frais
-//           </button>
-//         </div>
-//         <button
-//           onClick={onClose}
-//           className="mt-4 text-sm text-gray-500 hover:underline"
-//         >
-//           Annuler
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
 
 
 // === Utilitaire distance (Haversine) ===
@@ -159,32 +110,6 @@ export default function MapView({
   selectedAlert,
   cancelReport,
 }) {
-//   const [acceptModal, setAcceptModal] = useState({ isOpen: false, report: null, solidaire: null });
-
-// const handleAcceptClick = (report, solidaire) => {
-//   setAcceptModal({ isOpen: true, report, solidaire });
-// };
-
-// const handleConfirmPricing = async (mode, pricing) => {
-//   const { report, solidaire } = acceptModal;
-//   if (!report || !solidaire) return;
-
-//   const reportRef = doc(db, "reports", report.id);
-//   await updateDoc(reportRef, {
-//     status: "aide confirmée",
-//     pricing,
-//     helperUid: solidaire.uid,
-//   });
-
-//   toast.success(
-//     mode === "gratuit"
-//       ? "✅ Vous avez confirmé une aide gratuite."
-//       : `✅ Aide confirmée avec frais de ${pricing} €`
-//   );
-
-//   setAcceptModal({ isOpen: false, report: null, solidaire: null });
-// };
-
 
   // Suivi temps réel du report actif
   useEffect(() => {
@@ -283,30 +208,31 @@ export default function MapView({
         ))}
 
         {filteredSolidaires.map((s) => {
-  let status = "relevant";
+          let status = "relevant";
 
-  const reportForSolidaire = reports.find(
-    (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
-  );
+          const reportForSolidaire = reports.find(
+            (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
+          );
 
-  if (reportForSolidaire) {
-    if (reportForSolidaire.status === "aide confirmée") {
-      status = "busy"; // ✅ occupé
-    } else {
-      status = "alerted"; // 📞 déjà alerté
-    }
-  }
+          if (reportForSolidaire) {
+            if (reportForSolidaire.status === "aide confirmée") {
+              status = "busy"; // ✅ occupé
+            } else {
+              status = "alerted"; // 📞 déjà alerté
+            }
+          }
 
-  const pendingAlertsCount = reports.filter(
-    (r) => r.helperUid === s.uid && !["aide confirmée", "annulé"].includes(r.status)
-  ).length;
+          const pendingAlertsCount = reports.filter(
+            (r) => r.helperUid === s.uid && !["aide confirmée", "annulé"].includes(r.status)
+          ).length;
 
-  const distance = getDistanceKm(
-    userPosition[0],
-    userPosition[1],
-    s.latitude,
-    s.longitude
-  );
+
+          const distance = getDistanceKm(
+            userPosition[0],
+            userPosition[1],
+            s.latitude,
+            s.longitude
+          );
 
   return (
           <Marker
