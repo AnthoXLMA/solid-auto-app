@@ -57,53 +57,53 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
 };
 
 // === Modal d’acceptation ===
-function AcceptModal({ isOpen, onClose, report, solidaire, onConfirm }) {
-  if (!isOpen || !report || !solidaire) return null;
+// function AcceptModal({ isOpen, onClose, report, solidaire, onConfirm }) {
+//   if (!isOpen || !report || !solidaire) return null;
 
-  const distance = getDistanceKm(
-    solidaire.latitude,
-    solidaire.longitude,
-    report.latitude,
-    report.longitude
-  );
+//   const distance = getDistanceKm(
+//     solidaire.latitude,
+//     solidaire.longitude,
+//     report.latitude,
+//     report.longitude
+//   );
 
-  const baseFare = distance * 0.5; // Exemple : 0.5€/km
-  const finalFare = (baseFare * 1.2).toFixed(2); // +20%
+//   const baseFare = distance * 0.5; // Exemple : 0.5€/km
+//   const finalFare = (baseFare * 1.2).toFixed(2); // +20%
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-        <h2 className="text-lg font-bold mb-4">Confirmer votre aide</h2>
-        <p className="mb-6">
-          Vous êtes à <strong>{distance} km</strong> du sinistré.
-          <br />
-          Les frais de dépannage sont estimés à :{" "}
-          <strong>{finalFare} €</strong>
-        </p>
-        <div className="flex justify-between">
-          <button
-            onClick={() => onConfirm("payant", finalFare)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            Conserver les frais
-          </button>
-          <button
-            onClick={() => onConfirm("gratuit", 0)}
-            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-          >
-            Annuler les frais
-          </button>
-        </div>
-        <button
-          onClick={onClose}
-          className="mt-4 text-sm text-gray-500 hover:underline"
-        >
-          Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
+//   return (
+//     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+//       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+//         <h2 className="text-lg font-bold mb-4">Confirmer votre aide</h2>
+//         <p className="mb-6">
+//           Vous êtes à <strong>{distance} km</strong> du sinistré.
+//           <br />
+//           Les frais de dépannage sont estimés à :{" "}
+//           <strong>{finalFare} €</strong>
+//         </p>
+//         <div className="flex justify-between">
+//           <button
+//             onClick={() => onConfirm("payant", finalFare)}
+//             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+//           >
+//             Conserver les frais
+//           </button>
+//           <button
+//             onClick={() => onConfirm("gratuit", 0)}
+//             className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+//           >
+//             Annuler les frais
+//           </button>
+//         </div>
+//         <button
+//           onClick={onClose}
+//           className="mt-4 text-sm text-gray-500 hover:underline"
+//         >
+//           Annuler
+//         </button>
+//       </div>
+//     </div>
+//   );
+// }
 
 
 // === Utilitaire distance (Haversine) ===
@@ -154,31 +154,31 @@ export default function MapView({
   selectedAlert,
   cancelReport,
 }) {
-  const [acceptModal, setAcceptModal] = useState({ isOpen: false, report: null, solidaire: null });
+//   const [acceptModal, setAcceptModal] = useState({ isOpen: false, report: null, solidaire: null });
 
-const handleAcceptClick = (report, solidaire) => {
-  setAcceptModal({ isOpen: true, report, solidaire });
-};
+// const handleAcceptClick = (report, solidaire) => {
+//   setAcceptModal({ isOpen: true, report, solidaire });
+// };
 
-const handleConfirmPricing = async (mode, pricing) => {
-  const { report, solidaire } = acceptModal;
-  if (!report || !solidaire) return;
+// const handleConfirmPricing = async (mode, pricing) => {
+//   const { report, solidaire } = acceptModal;
+//   if (!report || !solidaire) return;
 
-  const reportRef = doc(db, "reports", report.id);
-  await updateDoc(reportRef, {
-    status: "aide confirmée",
-    pricing,
-    helperUid: solidaire.uid,
-  });
+//   const reportRef = doc(db, "reports", report.id);
+//   await updateDoc(reportRef, {
+//     status: "aide confirmée",
+//     pricing,
+//     helperUid: solidaire.uid,
+//   });
 
-  toast.success(
-    mode === "gratuit"
-      ? "✅ Vous avez confirmé une aide gratuite."
-      : `✅ Aide confirmée avec frais de ${pricing} €`
-  );
+//   toast.success(
+//     mode === "gratuit"
+//       ? "✅ Vous avez confirmé une aide gratuite."
+//       : `✅ Aide confirmée avec frais de ${pricing} €`
+//   );
 
-  setAcceptModal({ isOpen: false, report: null, solidaire: null });
-};
+//   setAcceptModal({ isOpen: false, report: null, solidaire: null });
+// };
 
 
   // Suivi temps réel du report actif
@@ -230,13 +230,13 @@ const handleConfirmPricing = async (mode, pricing) => {
 
   return (
     <>
-      <AcceptModal
+      {/*<AcceptModal
         isOpen={acceptModal.isOpen}
         onClose={() => setAcceptModal({ isOpen: false, report: null })}
         report={acceptModal.report}
         onConfirm={handleConfirmPricing}
       />
-
+*/}
       <MapContainer
         center={userPosition}
         zoom={13}
