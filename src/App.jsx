@@ -159,21 +159,24 @@ export default function App() {
   };
 
   // Filtrage solidaires pour report actif
-  const filteredSolidaires = solidaires.map((s) => {
-    if (!activeReport) return { ...s, status: "normal" };
-    const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
-    const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
-    const isRelevant =
-      s.materiel &&
-      activeReport.nature &&
-      s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+  const filteredSolidaires = solidaires
+    .filter((s) => s.uid !== user?.uid) // 🔥 exclure le Current User
+    .map((s) => {
+      if (!activeReport) return { ...s, status: "normal" };
+      const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
+      const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+      const isRelevant =
+        s.materiel &&
+        activeReport.nature &&
+        s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
 
-    let status = "irrelevant";
-    if (alreadyAlerted) status = "alerted";
-    else if (isRelevant) status = "relevant";
-    if (pendingAlertsCount > 0) status = "alerted";
-    return { ...s, alreadyAlerted, pendingAlertsCount, status };
-  });
+      let status = "irrelevant";
+      if (alreadyAlerted) status = "alerted";
+      else if (isRelevant) status = "relevant";
+      if (pendingAlertsCount > 0) status = "alerted";
+      return { ...s, alreadyAlerted, pendingAlertsCount, status };
+    });
+
 
   // Alerter un solidaire
   const onAlertUser = async (solidaire) => {
@@ -203,9 +206,23 @@ export default function App() {
     }
   };
 
-  // Annuler un report
+    // Annuler un report (seulement si c'est le sien)
   const cancelReport = async (reportId) => {
+    if (!user) return;
     try {
+      const reportDoc = await getDoc(doc(db, "reports", reportId));
+      if (!reportDoc.exists()) {
+        toast.error("⚠️ Report introuvable.");
+        return;
+      }
+
+      const reportData = reportDoc.data();
+      // 🔒 Vérification : seul le ownerUid peut annuler
+      if (reportData.ownerUid !== user.uid) {
+        toast.error("⛔ Vous ne pouvez pas annuler la panne d'un autre utilisateur !");
+        return;
+      }
+
       await deleteDoc(doc(db, "reports", reportId));
       setActiveReport(null);
       toast.info("🗑️ Votre demande de panne a été annulée !");
@@ -214,6 +231,7 @@ export default function App() {
       toast.error("❌ Impossible d'annuler la panne pour le moment.");
     }
   };
+
 
   // Si pas d'utilisateur connecté, afficher Auth
   if (!user) return <Auth />;
