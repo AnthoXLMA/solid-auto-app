@@ -5,7 +5,7 @@ import ReportForm from "./ReportForm";
 import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -46,6 +46,17 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // LogOut
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast.info("👋 Déconnexion réussie !");
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion :", err);
+      toast.error("❌ Impossible de se déconnecter.");
+    }
+  };
 
   // Géolocalisation
   useEffect(() => {
@@ -119,7 +130,6 @@ export default function App() {
       const allReports = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setReports(allReports);
 
-      // Synchroniser activeReport si mis à jour
       if (activeReport) {
         const updated = allReports.find((r) => r.id === activeReport.id);
         if (updated) setActiveReport(updated);
@@ -205,10 +215,19 @@ export default function App() {
     }
   };
 
+  // Si pas d'utilisateur connecté, afficher Auth
+  if (!user) return <Auth />;
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow">
-        <h1 className="text-xl font-bold">Bienvenue {user?.email}</h1>
+        <h1 className="text-xl font-bold">Bienvenue {user.email}</h1>
+        <button
+          onClick={handleLogout}
+          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+        >
+          Se déconnecter
+        </button>
       </header>
 
       <main className="flex flex-1 p-4 gap-4 bg-gray-50">
