@@ -17,6 +17,7 @@ const reportIcon = new L.Icon({
   iconSize: [45, 45],
 });
 
+// === Icônes ===
 const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   let baseIconUrl;
   switch (status) {
@@ -24,9 +25,13 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
       baseIconUrl =
         "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000"; // icône rouge
       break;
-    case "confirmed":
+    case "confirmed": // déjà utilisé pour aide confirmée
       baseIconUrl =
         "https://img.icons8.com/?size=100&id=63227&format=png&color=000000"; // icône verte
+      break;
+    case "busy": // nouveau : occupé
+      baseIconUrl =
+        "https://img.icons8.com/?size=100&id=59817&format=png&color=000000"; // sablier
       break;
     default:
       baseIconUrl =
@@ -277,51 +282,58 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* Solidaires filtrés */}
         {filteredSolidaires.map((s) => {
-          let status = "relevant";
-          const reportForSolidaire = reports.find(
-            (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
-          );
+  let status = "relevant";
 
-          if (reportForSolidaire) {
-            status = reportForSolidaire.status === "aide confirmée" ? "confirmed" : "alerted";
-          }
+  const reportForSolidaire = reports.find(
+    (r) => r.helperUid === s.uid && !["annulé"].includes(r.status)
+  );
 
-          const pendingAlertsCount =
-            s.uid === currentUserUid
-              ? reports.filter(
-                  (r) =>
-                    r.helperUid === s.uid &&
-                    !["aide confirmée", "annulé"].includes(r.status)
-                ).length
-              : 0;
+  if (reportForSolidaire) {
+    if (reportForSolidaire.status === "aide confirmée") {
+      status = "busy"; // ✅ occupé
+    } else {
+      status = "alerted"; // 📞 déjà alerté
+    }
+  }
 
-          const distance = getDistanceKm(
-            userPosition[0],
-            userPosition[1],
-            s.latitude,
-            s.longitude
-          );
+  const pendingAlertsCount = reports.filter(
+    (r) => r.helperUid === s.uid && !["aide confirmée", "annulé"].includes(r.status)
+  ).length;
 
-          return (
-            <Marker
-              key={s.uid}
-              position={[s.latitude, s.longitude]}
-              icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
-            >
-              <Popup>
-                <strong>👤 {s.name}</strong> <br />
-                Matériel : {s.materiel} <br />
-                📏 Distance : {distance} km <br />
-                {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà alerté</span>}
-                {status === "confirmed" && <span style={{ color: "green" }}>✅ Aide confirmée</span>}
-                {status === "relevant" && s.uid !== currentUserUid && (
-                  <button onClick={() => { onAlertUser(s); toast.success(`⚡ Alerte envoyée à ${s.name}`); }}>⚡ Alerter</button>
-                )}
-              </Popup>
+  const distance = getDistanceKm(
+    userPosition[0],
+    userPosition[1],
+    s.latitude,
+    s.longitude
+  );
 
-            </Marker>
+  return (
+          <Marker
+            key={s.uid}
+            position={[s.latitude, s.longitude]}
+            icon={getSolidaireIconWithBadge(status, pendingAlertsCount)}
+              >
+                <Popup>
+                  <strong>👤 {s.name}</strong> <br />
+                  Matériel : {s.materiel} <br />
+                  📏 Distance : {distance} km <br />
+                  {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà alerté</span>}
+                  {status === "busy" && <span style={{ color: "red" }}>⏳ Occupé</span>}
+                  {status === "relevant" && s.uid !== currentUserUid && (
+                    <button
+                      onClick={() => {
+                        onAlertUser(s);
+                        toast.success(`⚡ Alerte envoyée à ${s.name}`);
+                      }}
+                    >
+                      ⚡ Alerter
+                    </button>
+                  )}
+                </Popup>
+              </Marker>
+            );
+          })}
           );
         })}
       </MapContainer>
