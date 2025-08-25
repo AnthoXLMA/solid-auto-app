@@ -15,13 +15,19 @@ export default function ModalPortal({ children, onClose }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: 9999, // au-dessus de Leaflet
       }}
-      onClick={onClose} // ferme si on clique en dehors
+      onClick={onClose}
     >
       <div
-        style={{ background: "#fff", borderRadius: 12, padding: 20, minWidth: 300 }}
-        onClick={(e) => e.stopPropagation()} // empêche la fermeture si on clique dedans
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          padding: "20px",
+          width: "360px",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+        }}
+        onClick={(e) => e.stopPropagation()} // évite de fermer si on clique dans le modal
       >
         {children}
       </div>
