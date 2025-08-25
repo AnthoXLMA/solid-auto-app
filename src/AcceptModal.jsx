@@ -7,7 +7,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
   if (!isOpen || !alerte) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
         <h2 className="text-lg font-bold mb-4">Confirmer le dépannage</h2>
         <p className="mb-4 text-sm text-gray-700">

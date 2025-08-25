@@ -41,24 +41,15 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
   // ✅ Accepter une alerte (ouvre le modal de calcul des frais)
   const acceptAlert = async (alerte) => {
-    try {
-      const reportRef = doc(db, "reports", alerte.reportId);
-      const reportSnap = await getDoc(reportRef);
-
-      if (!reportSnap.exists()) {
-        console.warn("⚠️ Report introuvable :", alerte.reportId);
-        await deleteDoc(doc(db, "alertes", alerte.id));
-        removeAlertWithAnimation(alerte.id);
-        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
-        return;
-      }
-
-      setAcceptModal({ isOpen: true, alerte });
-    } catch (err) {
-      console.error("Erreur acceptation :", err);
-      toast.error("❌ Une erreur est survenue lors de l’acceptation.");
-    }
-  };
+  try {
+    // On ne change pas report.status ici !
+    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+    setAcceptModal({ isOpen: true, alerte });
+  } catch (err) {
+    console.error("Erreur acceptation :", err);
+    toast.error("❌ Une erreur est survenue lors de l’acceptation.");
+  }
+};
 
   // ✅ Confirmation depuis le modal (calcul + update Firestore)
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
