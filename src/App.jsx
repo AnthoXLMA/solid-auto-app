@@ -119,7 +119,7 @@ export default function App() {
           name: user.email,
           latitude: currentPosition[0],
           longitude: currentPosition[1],
-          materiel: user.materiel || "pinces",
+          materiel: user.materiel || "batterie",
         },
         { merge: true }
       );
@@ -235,8 +235,6 @@ export default function App() {
     }
   };
 
-
-
   // Si pas d'utilisateur connecté, afficher Auth
   if (!user) return <Auth />;
 
@@ -320,7 +318,7 @@ export default function App() {
 
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
-        © {new Date().getFullYear()} U-boto - Tous droits réservés
+        © {new Date().getFullYear()} U-Boto - Tous droits réservés
       </footer>
 
       <ToastContainer position="top-right" autoClose={3000} />
