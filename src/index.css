@@ -1,35 +1,3 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
-.map-and-report-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;  /* espace vertical entre la carte et le texte */
-  max-width: 600px;
-  margin: auto;
-  padding: 20px;
-}
-
-.leaflet-container {
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
-  /* hauteur et largeur déjà dans style inline ou ici si tu préfères */
-  height: 500px;
-  width: 100%;
-}
-
-.report-text {
-  font-size: 1.2rem;
-  color: #333;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

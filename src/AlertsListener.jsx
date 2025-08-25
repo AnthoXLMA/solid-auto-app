@@ -76,7 +76,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(reportRef, {
-        status: "aide confirmée",
+        status: "aide en cours",   // 🔥 cohérent avec App.jsx
         helperUid: user.uid,
         frais: fraisAnnules ? 0 : montant,
       });
