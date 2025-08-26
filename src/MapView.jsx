@@ -5,6 +5,8 @@ import L from "leaflet";
 import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
+import PaymentBanner from "./PaymentBanner";
+
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -199,6 +201,15 @@ export default function MapView({
       {activeReport?.helperConfirmed && activeReport.helperUid && (
         <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
       )}
+
+      {/* === Bandeau paiement (escrow) === */}
+      {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
+        <PaymentBanner
+          report={activeReport}
+          solidaire={solidaires.find(s => s.uid === activeReport.helperUid)}
+        />
+      )}
+
       {/* Utilisateur */}
       <Marker position={userPosition} icon={currentUserIcon}>
         <Popup>🙋‍♂️ Vous êtes ici</Popup>
