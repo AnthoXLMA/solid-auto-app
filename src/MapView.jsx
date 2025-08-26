@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { onSnapshot, doc } from "firebase/firestore";
+import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 
@@ -94,13 +94,16 @@ export default function MapView({
   cancelReport,
   currentUserUid,
 }) {
+  const [distanceToHelper, setDistanceToHelper] = useState(null);
+
   // Suivi temps réel du report actif
   useEffect(() => {
     if (!activeReport) return;
     const reportRef = doc(db, "reports", activeReport.id);
     const unsub = onSnapshot(reportRef, (docSnap) => {
-      if (!docSnap.exists()) cancelReport(activeReport.id);
-      else {
+      if (!docSnap.exists()) {
+        cancelReport(activeReport.id);
+      } else {
         const data = docSnap.data();
         if (
           data.status !== activeReport.status ||
@@ -112,11 +115,30 @@ export default function MapView({
             helperUid: data.helperUid,
             helperConfirmed: data.helperConfirmed,
           });
+
+          // Notification quand le solidaire confirme
+          if (data.helperConfirmed && !activeReport.helperConfirmed) {
+            toast.info(`🚗 ${data.helperName} est en route pour vous aider`);
+          }
         }
       }
     });
     return () => unsub();
   }, [activeReport, cancelReport, onReportClick]);
+
+  // Calcul distance en temps réel
+  useEffect(() => {
+    if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return;
+
+    const interval = setInterval(() => {
+      const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
+      if (!helper || !helper.latitude || !helper.longitude) return;
+      const dist = getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude);
+      setDistanceToHelper(dist);
+    }, 5000); // toutes les 5 secondes
+
+    return () => clearInterval(interval);
+  }, [activeReport, solidaires, userPosition]);
 
   if (!userPosition || userPosition.length < 2 || userPosition[0] == null || userPosition[1] == null)
     return <div>📍 Localisation en cours...</div>;
@@ -130,16 +152,11 @@ export default function MapView({
   }
 
   // Bandeau helper confirmé uniquement
-  function HelperBanner({ activeReport, solidaires, userPosition }) {
+  function HelperBanner({ activeReport, solidaires, userPosition, distance }) {
     if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
 
     const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
     if (!helper) return null;
-
-    const distance =
-      helper.latitude && helper.longitude
-        ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
-        : null;
 
     return (
       <div
@@ -174,8 +191,8 @@ export default function MapView({
 
       <SetViewOnUser position={userPosition} />
       {alertLocation && <FlyToLocation alert={alertLocation} />}
-      {/* === Bandeau suivi du solidaire === */}
-      <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
+      <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} distance={distanceToHelper} />
+
       {/* Utilisateur */}
       <Marker position={userPosition} icon={currentUserIcon}>
         <Popup>🙋‍♂️ Vous êtes ici</Popup>
