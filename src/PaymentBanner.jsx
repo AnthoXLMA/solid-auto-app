@@ -3,6 +3,7 @@ import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowServ
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
+
 // Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
