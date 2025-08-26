@@ -25,6 +25,7 @@ import "react-toastify/dist/ReactToastify.css";
 import useReportsListener from "./useReportsListener";
 import PayButton from "./PayButton";
 
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState(null);
@@ -109,6 +110,28 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // Online / Offline
+  useEffect(() => {
+    if (!user) return;
+
+    const userRef = doc(db, "solidaires", user.uid);
+
+    // Marquer comme online quand connecté
+    setDoc(userRef, { online: true }, { merge: true }).catch(() => {});
+
+    // Marquer offline quand on quitte
+    const handleBeforeUnload = () => {
+      setDoc(userRef, { online: false }, { merge: true }).catch(() => {});
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      setDoc(userRef, { online: false }, { merge: true }).catch(() => {});
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [user]);
+
   // Mise à jour position
   useEffect(() => {
     if (user && currentPosition) {
@@ -120,6 +143,7 @@ export default function App() {
           latitude: currentPosition[0],
           longitude: currentPosition[1],
           materiel: user.materiel || "batterie",
+          online: true,
         },
         { merge: true }
       );
@@ -209,7 +233,7 @@ export default function App() {
     }
   };
 
-    // Annuler un report (seulement si c'est le sien)
+  // Annuler un report (seulement si c'est le sien)
   const cancelReport = async (reportId) => {
     if (!user) return;
     try {
@@ -250,71 +274,72 @@ export default function App() {
         </button>
       </header>
 
-<main className="flex-1 relative bg-gray-100">
-  {/* Carte occupe tout */}
-  <div className="absolute inset-0">
-    <MapView
-      reports={reports}
-      solidaires={filteredSolidaires}
-      alerts={alerts}
-      userPosition={currentPosition}
-      onPositionChange={setCurrentPosition}
-      onReportClick={setActiveReport}
-      onAlertUser={onAlertUser}
-      activeReport={activeReport}
-      selectedAlert={selectedAlert}
-      cancelReport={cancelReport}
-      currentUserUid={user.uid}
-    />
-  </div>
-    {/* Bouton + SUR la carte */}
-    <button
-      onClick={() => setShowReportForm(true)}
-      className="absolute bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
-                 rounded-full shadow-2xl flex items-center justify-center
-                 text-white text-4xl font-bold border-4 border-white
-                 transition-transform transform hover:scale-110 z-50"
-    >
-      +
-    </button>
+      <main className="flex-1 relative bg-gray-100">
+        {/* Carte occupe tout */}
+        <div className="absolute inset-0">
+          <MapView
+            reports={reports}
+            solidaires={filteredSolidaires}
+            alerts={alerts}
+            userPosition={currentPosition}
+            onPositionChange={setCurrentPosition}
+            onReportClick={setActiveReport}
+            onAlertUser={onAlertUser}
+            activeReport={activeReport}
+            selectedAlert={selectedAlert}
+            cancelReport={cancelReport}
+            currentUserUid={user.uid}
+          />
+        </div>
 
-  {/* Bottom sheet : Report Form */}
-  {showReportForm && (
-    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-50">
-      <ReportForm
-        userPosition={currentPosition}
-        onNewReport={(r) => {
-          handleNewReport(r);
-          setShowReportForm(false);
-        }}
-      />
-      <button
-        onClick={() => setShowReportForm(false)}
-        className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
-      >
-        Fermer
-      </button>
-    </div>
-  )}
+        {/* Bouton + SUR la carte */}
+        <button
+          onClick={() => setShowReportForm(true)}
+          className="absolute bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
+                     rounded-full shadow-2xl flex items-center justify-center
+                     text-white text-4xl font-bold border-4 border-white
+                     transition-transform transform hover:scale-110 z-50"
+        >
+          +
+        </button>
 
-  {/* Bottom sheet : Alertes */}
-  {user && alerts.length > 0 && (
-    <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
-      <AlertsListener
-        user={user}
-        setSelectedAlert={setSelectedAlert}
-        userPosition={currentPosition}
-      />
-    </div>
-  )}
+        {/* Bottom sheet : Report Form */}
+        {showReportForm && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-50">
+            <ReportForm
+              userPosition={currentPosition}
+              onNewReport={(r) => {
+                handleNewReport(r);
+                setShowReportForm(false);
+              }}
+            />
+            <button
+              onClick={() => setShowReportForm(false)}
+              className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
+            >
+              Fermer
+            </button>
+          </div>
+        )}
 
-  {/* Paiement : affiché comme une card flottante */}
-  {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
-    <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
-      <PayButton report={activeReport} />
-    </div>
-  )}
-</main>
+        {/* Bottom sheet : Alertes */}
+        {user && alerts.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
+            <AlertsListener
+              user={user}
+              setSelectedAlert={setSelectedAlert}
+              userPosition={currentPosition}
+            />
+          </div>
+        )}
+
+        {/* Paiement : affiché comme une card flottante */}
+        {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
+          <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
+            <PayButton report={activeReport} />
+          </div>
+        )}
+      </main>
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
         © {new Date().getFullYear()} U-Boto - Tous droits réservés
