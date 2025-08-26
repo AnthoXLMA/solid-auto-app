@@ -1,14 +1,16 @@
-import { createPaymentIntent, capturePayment, refundPayment } from "./stripeService";
-
-// Simule un escrow pour bloquer la somme
-const escrows = {}; // en production, stocker côté backend/Firebase
+const escrows = {}; // Stockage temporaire frontend (juste pour l’état UI)
 
 export const createEscrow = async (reportId, amount, setPaymentStatus) => {
   try {
     setPaymentStatus("pending");
-    const clientSecret = await createPaymentIntent(reportId, amount);
-    escrows[reportId] = { clientSecret, status: "pending" };
-    console.log("Escrow créé pour report:", reportId);
+    const res = await fetch("/api/create-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reportId, amount }),
+    });
+    const data = await res.json();
+    escrows[reportId] = { clientSecret: data.clientSecret, status: "pending" };
+    console.log("Escrow créé côté backend :", escrows[reportId]);
   } catch (err) {
     console.error(err);
     setPaymentStatus("error");
@@ -19,7 +21,11 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
   try {
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
-    await capturePayment(escrow.clientSecret);
+    await fetch("/api/capture-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentIntentId: escrow.clientSecret }),
+    });
     escrow.status = "released";
     setPaymentStatus("released");
   } catch (err) {
@@ -32,7 +38,11 @@ export const refundEscrow = async (reportId, setPaymentStatus) => {
   try {
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
-    await refundPayment(escrow.clientSecret);
+    await fetch("/api/refund-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentIntentId: escrow.clientSecret }),
+    });
     escrow.status = "refunded";
     setPaymentStatus("refunded");
   } catch (err) {
