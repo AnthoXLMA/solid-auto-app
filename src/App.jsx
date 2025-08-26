@@ -25,6 +25,8 @@ import "react-toastify/dist/ReactToastify.css";
 import useReportsListener from "./useReportsListener";
 import PayButton from "./PayButton";
 import { updateUserStatus } from "./userService";
+import { useNavigate } from "react-router-dom";
+
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -198,6 +200,8 @@ export default function App() {
   return () => unsub();
 }, [user]);
 
+  //Fonction Navigate pour la redirection des icones du menu flottan
+  const navigate = useNavigate();
 
   // Création de report
   const handleNewReport = async (newReport) => {
@@ -325,10 +329,34 @@ export default function App() {
           />
         </div>
 
+        <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-between items-center z-40">
+          <span>👥 {solidaires.filter(s => s.online).length} utilisateurs en ligne</span>
+          <span>⚡ {reports.length} pannes actives</span>
+        </div>
+
+        <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-around items-center z-40">
+          <button onClick={() => navigate("/map")} className="flex flex-col items-center">
+            🗺️
+            <span className="text-xs">Carte</span>
+          </button>
+          <button onClick={() => navigate("/chat")} className="flex flex-col items-center">
+            💬
+            <span className="text-xs">Chat</span>
+          </button>
+          <button onClick={() => navigate("/feed")} className="flex flex-col items-center">
+            📰
+            <span className="text-xs">Feed</span>
+          </button>
+          <button onClick={() => setShowReportForm(true)} className="flex flex-col items-center">
+            ➕
+            <span className="text-xs">Ajouter</span>
+          </button>
+        </div>
+
         {/* Bouton + SUR la carte */}
         <button
           onClick={() => setShowReportForm(true)}
-          className="absolute bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
+          className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
                      rounded-full shadow-2xl flex items-center justify-center
                      text-white text-4xl font-bold border-4 border-white
                      transition-transform transform hover:scale-110 z-50"
@@ -338,7 +366,7 @@ export default function App() {
 
         {/* Bottom sheet : Report Form */}
         {showReportForm && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-50">
+        <div className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40`}>
             <ReportForm
               userPosition={currentPosition}
               onNewReport={(r) => {
