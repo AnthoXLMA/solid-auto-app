@@ -7,6 +7,11 @@ import { loadStripe } from "@stripe/stripe-js";
 // Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
+if (!process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY) {
+  console.error("La clé publique Stripe n'est pas définie !");
+}
+
+
 function StripeCheckout({ report, setPaymentStatus }) {
   const stripe = useStripe();
   const elements = useElements();
