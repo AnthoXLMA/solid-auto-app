@@ -27,13 +27,13 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
 
         <div className="flex gap-2 mb-4">
           <button
-            onClick={() => onConfirm(alerte, montant, false)}
+            onClick={() => { onConfirm(alerte, montant, false); onClose(); }}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             ✅ Conserver les frais
           </button>
           <button
-            onClick={() => onConfirm(alerte, 0, true)}
+            onClick={() => { onConfirm(alerte, 0, true); onClose(); }}
             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
           >
             🙌 Annuler les frais

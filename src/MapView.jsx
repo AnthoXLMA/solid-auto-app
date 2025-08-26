@@ -152,35 +152,40 @@ export default function MapView({
   }
 
   // Bandeau helper confirmé uniquement
-  function HelperBanner({ activeReport, solidaires, userPosition, distance }) {
-    if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
+  function HelperBanner({ activeReport, solidaires, userPosition }) {
+  if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
+  const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
+  if (!helper) return null;
 
-    const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
-    if (!helper) return null;
+  const distance =
+    helper.latitude && helper.longitude
+      ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
+      : null;
 
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "#e6f7ff",
-          border: "1px solid #91d5ff",
-          padding: "8px 16px",
-          borderRadius: "12px",
-          zIndex: 1000,
-          fontWeight: "bold",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        🚗 {helper.name} est en route pour vous aider
-        {distance && <span>📏 Distance restante : {distance} km</span>}
-      </div>
-    );
-  }
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 10,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#e6f7ff",
+        border: "1px solid #91d5ff",
+        padding: "8px 16px",
+        borderRadius: "12px",
+        zIndex: 1000,
+        fontWeight: "bold",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+    >
+      🚗 {helper.name} est en route pour vous aider
+      {distance && <span>📏 Distance restante : {distance} km</span>}
+    </div>
+  );
+}
+
 
   return (
     <MapContainer center={userPosition} zoom={13} style={{ height: "500px", width: "100%", zIndex: 0 }} scrollWheelZoom>
@@ -191,8 +196,9 @@ export default function MapView({
 
       <SetViewOnUser position={userPosition} />
       {alertLocation && <FlyToLocation alert={alertLocation} />}
-      <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} distance={distanceToHelper} />
-
+      {activeReport?.helperConfirmed && activeReport.helperUid && (
+        <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
+      )}
       {/* Utilisateur */}
       <Marker position={userPosition} icon={currentUserIcon}>
         <Popup>🙋‍♂️ Vous êtes ici</Popup>
