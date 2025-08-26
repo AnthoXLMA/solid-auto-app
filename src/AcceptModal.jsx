@@ -1,5 +1,15 @@
 import React, { useState } from "react";
 
+/**
+ * AcceptModal
+ *
+ * Props :
+ * - isOpen : boolean, si le modal doit s'afficher
+ * - onClose : function, ferme le modal
+ * - alerte : objet report/alerte sur lequel agir
+ * - onConfirm : function, appelée lors de la confirmation du montant
+ * - onStartRepair : function optionnelle, lance le modal InProgress pour le solidaire
+ */
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
   const [montant, setMontant] = useState(0);
 
@@ -10,7 +20,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
     onConfirm(alerte, fraisAnnules ? 0 : montant, fraisAnnules);
     // 2️⃣ Fermer le modal actuel
     onClose();
-    // 3️⃣ Lancer le modal solidaire en cours
+    // 3️⃣ Lancer le modal solidaire en cours si fourni
     if (onStartRepair) onStartRepair(alerte);
   };
 
