@@ -3,7 +3,7 @@ import './index.css';
 import Auth from "./Auth";
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
-import Chat from "./Chat";
+// import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -209,6 +209,21 @@ export default function App() {
     }
   };
 
+//   const handleAlertUser = async (solidaire) => {
+//   try {
+//     await addDoc(collection(db, "alerts"), {
+//       fromUid: currentUser.uid,
+//       toUid: solidaire.uid,
+//       reportId: activeReport?.id,
+//       createdAt: serverTimestamp(),
+//     });
+//     toast.success(`🚨 ${solidaire.name} a été alerté !`);
+//   } catch (err) {
+//     console.error("Erreur en alertant :", err);
+//     toast.error("❌ Impossible d'alerter ce solidaire");
+//   }
+// };
+
     // Annuler un report (seulement si c'est le sien)
   const cancelReport = async (reportId) => {
     if (!user) return;
@@ -264,6 +279,7 @@ export default function App() {
       activeReport={activeReport}
       selectedAlert={selectedAlert}
       cancelReport={cancelReport}
+      currentUserUid={user.uid}
     />
   </div>
     {/* Bouton + SUR la carte */}
@@ -314,8 +330,6 @@ export default function App() {
     </div>
   )}
 </main>
-
-
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
         © {new Date().getFullYear()} U-Boto - Tous droits réservés
