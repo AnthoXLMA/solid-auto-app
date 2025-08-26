@@ -3,7 +3,6 @@ import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowServ
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
-// Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function StripeCheckout({ report, setPaymentStatus }) {
@@ -12,19 +11,18 @@ function StripeCheckout({ report, setPaymentStatus }) {
   const [status, setStatus] = useState("");
 
   const handlePay = async () => {
+    if (!stripe || !elements) return;
     setPaymentStatus("pending");
 
     try {
-      // 1️⃣ Créer un paiement côté backend (API /create-payment)
-      const res = await fetch("http://localhost:4242/create-payment", {
+      const res = await fetch("/api/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: report.frais * 100 }), // Stripe en centimes
+        body: JSON.stringify({ reportId: report.id, amount: report.frais * 100 }),
       });
       const data = await res.json();
       const clientSecret = data.clientSecret;
 
-      // 2️⃣ Confirmer le paiement
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: { card: elements.getElement(CardElement) },
       });
@@ -34,7 +32,7 @@ function StripeCheckout({ report, setPaymentStatus }) {
         setPaymentStatus(null);
       } else if (result.paymentIntent.status === "succeeded") {
         setStatus("✅ Paiement effectué !");
-        setPaymentStatus("released"); // on utilise ton état existant
+        setPaymentStatus("released");
       }
     } catch (err) {
       setStatus("Erreur : " + err.message);
@@ -46,7 +44,7 @@ function StripeCheckout({ report, setPaymentStatus }) {
     <div style={{ marginTop: 10 }}>
       <CardElement />
       <button onClick={handlePay} disabled={!stripe} style={{ marginTop: 10 }}>
-        Bloquer le paiement avec Stripe
+        Payer avec Stripe
       </button>
       <p>{status}</p>
     </div>
@@ -74,7 +72,6 @@ export default function PaymentBanner({ report, solidaire }) {
       <p>🚗 {solidaire.name} est en route pour vous aider</p>
       <p>💰 Frais : {report.frais} €</p>
 
-      {/* Blocage classique via escrow */}
       {paymentStatus === null && (
         <button
           onClick={() => createEscrow(report.id, report.frais, setPaymentStatus)}
@@ -84,7 +81,6 @@ export default function PaymentBanner({ report, solidaire }) {
         </button>
       )}
 
-      {/* Stripe Checkout */}
       {paymentStatus === "pending" && (
         <Elements stripe={stripePromise}>
           <StripeCheckout report={report} setPaymentStatus={setPaymentStatus} />
@@ -94,7 +90,7 @@ export default function PaymentBanner({ report, solidaire }) {
       {paymentStatus === "released" && <p>✅ Paiement effectué !</p>}
       {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé !</p>}
 
-      {/* Simulation pour test */}
+      {/* Simulation test */}
       {paymentStatus === "pending" && (
         <div style={{ marginTop: 10 }}>
           <button onClick={() => releaseEscrow(report.id, setPaymentStatus)} style={{ marginRight: 10 }}>
