@@ -82,8 +82,9 @@ function FlyToLocation({ alert }) {
 }
 
 export default function MapView({
-  reports,
-  solidaires,
+  reports = [],
+  solidaires = [],
+  alerts = [],   // ✅ valeur par défaut tableau
   userPosition,
   onReportClick,
   onAlertUser,
@@ -157,36 +158,43 @@ export default function MapView({
       ))}
 
       {/* Solidaires */}
-      {solidaires.map((s) => {
-        let status = "relevant"; // normal
+{solidaires.map((s) => {
+  let status = "relevant";
 
-        // 1️⃣ Si solidaire est contacté pour le report actif
-        if (activeReport?.helperUid === s.uid) {
-          if (activeReport.status === "en attente") {
-            status = "alerted"; // contacté par sinistré → téléphone vert
-          } else if (activeReport.status === "aide en cours") {
-            status = "busy"; // a accepté → dépannage en cours
-          }
-        }
+  const isAlerted = activeReport
+    ? alerts.some((a) => a.reportId === activeReport.id && a.toUid === s.uid)
+    : false;
 
-        const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
+  if (activeReport?.helperUid === s.uid && activeReport.status === "aide en cours") {
+    status = "busy";
+  } else if (isAlerted) {
+    status = "alerted";
+  }
 
-        return (
-          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
-            <Popup>
-              <strong>👤 {s.name}</strong> <br />
-              Matériel : {s.materiel} <br />
-              📏 Distance : {distance} km <br />
+  const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
 
-              {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà contacté</span>}
-              {status === "busy" && <span style={{ color: "red" }}>⏳ Dépannage en cours</span>}
-              {status === "relevant" && s.uid !== currentUserUid && (
-                <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
-              )}
-            </Popup>
-          </Marker>
-        );
-      })}
+  return (
+    <Marker
+      key={s.uid}
+      position={[s.latitude, s.longitude]}
+      icon={getSolidaireIconWithBadge(status)}
+    >
+      <Popup>
+        <strong>👤 {s.name}</strong> <br />
+        Matériel : {s.materiel} <br />
+        📏 Distance : {distance} km <br />
+
+        {status === "alerted" && <span style={{ color: "orange" }}>📞 Déjà contacté</span>}
+        {status === "busy" && <span style={{ color: "red" }}>⏳ Dépannage en cours</span>}
+        {status === "relevant" && s.uid !== currentUserUid && (
+          <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+        )}
+      </Popup>
+    </Marker>
+  );
+})}
+
+
     </MapContainer>
   );
 }
