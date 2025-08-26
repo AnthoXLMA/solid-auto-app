@@ -10,7 +10,6 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import "./AlertsListener.css"; // fichier CSS pour l'animation
 import AcceptModal from "./AcceptModal";
 import { toast } from "react-toastify";
 
@@ -21,13 +20,10 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
-
     const unsub = onSnapshot(q, (snapshot) => {
       setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
-
     return () => unsub();
   }, [user]);
 
@@ -39,26 +35,22 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }, 300);
   };
 
-  // ✅ Accepter une alerte (ouvre le modal de calcul des frais)
   const acceptAlert = async (alerte) => {
-  try {
-    // On ne change pas report.status ici !
-    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-    setAcceptModal({ isOpen: true, alerte });
-  } catch (err) {
-    console.error("Erreur acceptation :", err);
-    toast.error("❌ Une erreur est survenue lors de l’acceptation.");
-  }
-};
+    try {
+      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+      setAcceptModal({ isOpen: true, alerte });
+    } catch (err) {
+      console.error("Erreur acceptation :", err);
+      toast.error("❌ Une erreur est survenue lors de l’acceptation.");
+    }
+  };
 
-  // ✅ Confirmation depuis le modal (calcul + update Firestore)
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
       const reportSnap = await getDoc(reportRef);
 
       if (!reportSnap.exists()) {
-        console.warn("⚠️ Report introuvable :", alerte.reportId);
         await deleteDoc(doc(db, "alertes", alerte.id));
         removeAlertWithAnimation(alerte.id);
         toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
@@ -67,7 +59,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(reportRef, {
-        status: "aide en cours",   // 🔥 cohérent avec App.jsx
+        status: "aide en cours",
         helperUid: user.uid,
         frais: fraisAnnules ? 0 : montant,
       });
@@ -81,7 +73,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
-  // ✅ Rejeter une alerte
   const rejectAlert = async (alerte) => {
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
@@ -100,11 +91,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
-  console.log("Modal ouvert ?", acceptModal);
-
   return (
     <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
-
       <h4>📢 Mes alertes reçues</h4>
 
       <AcceptModal
@@ -119,32 +107,11 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       ) : (
         <ul>
           {alerts.map((a) => (
-            <li
-              key={a.id}
-              className={removingIds.includes(a.id) ? "fade-out" : ""}
-              style={{ marginBottom: "8px", transition: "opacity 0.3s" }}
-            >
+            <li key={a.id} className={removingIds.includes(a.id) ? "fade-out" : ""} style={{ marginBottom: "8px", transition: "opacity 0.3s" }}>
               🚨 {a.fromUid} vous demande de l’aide (report: {a.reportId})
               <button onClick={() => setSelectedAlert(a)}>📍 Géolocaliser</button>
-
-              <button
-                style={{ marginLeft: "10px" }}
-                onClick={() => acceptAlert(a)}
-              >
-                ✅ Proposer mon aide
-              </button>
-
-              <button
-                style={{
-                  marginLeft: "5px",
-                  cursor: "pointer",
-                  backgroundColor: "#f8d7da",
-                  border: "none",
-                }}
-                onClick={() => rejectAlert(a)}
-              >
-                ❌ Rejeter
-              </button>
+              <button style={{ marginLeft: "10px" }} onClick={() => acceptAlert(a)}>✅ Proposer mon aide</button>
+              <button style={{ marginLeft: "5px", cursor: "pointer", backgroundColor: "#f8d7da", border: "none" }} onClick={() => rejectAlert(a)}>❌ Rejeter</button>
             </li>
           ))}
         </ul>

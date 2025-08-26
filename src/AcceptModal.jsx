@@ -1,4 +1,3 @@
-// src/AcceptModal.jsx
 import React, { useState } from "react";
 
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
@@ -15,7 +14,6 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
           (frais kilométriques + 20%) ou les <strong>annuler</strong> ?
         </p>
 
-        {/* Champ montant */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Montant estimé (€)</label>
           <input
@@ -27,7 +25,6 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
           />
         </div>
 
-        {/* Boutons */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => onConfirm(alerte, montant, false)}
