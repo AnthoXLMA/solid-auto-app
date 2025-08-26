@@ -182,6 +182,23 @@ export default function App() {
     return () => unsub();
   }, [user, activeReport?.id]);
 
+  useEffect(() => {
+  if (!user) return;
+  const q = query(collection(db, "reports"), where("ownerUid", "==", user.uid));
+  const unsub = onSnapshot(q, (snapshot) => {
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.notificationForOwner) {
+        toast.info(data.notificationForOwner);
+        // Supprimer le champ pour ne pas répéter le toast
+        updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+      }
+    });
+  });
+  return () => unsub();
+}, [user]);
+
+
   // Création de report
   const handleNewReport = async (newReport) => {
     if (!user) return;
