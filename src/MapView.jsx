@@ -27,7 +27,7 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
       baseIconUrl = "https://img.icons8.com/?size=100&id=59817&format=png&color=000000";
       break;
     case "offline":
-      baseIconUrl = "https://img.icons8.com/?size=100&id=107162&format=png&color=888888"; // gris pour offline
+      baseIconUrl = "https://img.icons8.com/?size=100&id=107162&format=png&color=888888";
       break;
     default:
       baseIconUrl = "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
@@ -102,12 +102,24 @@ export default function MapView({
       if (!docSnap.exists()) cancelReport(activeReport.id);
       else {
         const data = docSnap.data();
-        if (data.status !== activeReport.status)
-          onReportClick({ ...activeReport, status: data.status, helperUid: data.helperUid });
+        if (
+          data.status !== activeReport.status ||
+          data.helperConfirmed !== activeReport.helperConfirmed
+        ) {
+          onReportClick({
+            ...activeReport,
+            status: data.status,
+            helperUid: data.helperUid,
+            helperConfirmed: data.helperConfirmed,
+          });
+        }
       }
     });
     return () => unsub();
   }, [activeReport, cancelReport, onReportClick]);
+
+  if (!userPosition || userPosition.length < 2 || userPosition[0] == null || userPosition[1] == null)
+    return <div>📍 Localisation en cours...</div>;
 
   let alertLocation = null;
   if (selectedAlert) {
@@ -117,68 +129,17 @@ export default function MapView({
     }
   }
 
-  if (!userPosition || userPosition.length < 2 || userPosition[0] == null || userPosition[1] == null)
-    return <div>📍 Localisation en cours...</div>;
-
-  // Ajoute ce composant juste avant le return de MapContainer
+  // Bandeau helper confirmé uniquement
   function HelperBanner({ activeReport, solidaires, userPosition }) {
-    if (!activeReport || !activeReport.helperUid) return null;
+    if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
 
     const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
     if (!helper) return null;
 
-    const distance = helper.latitude && helper.longitude
-      ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
-      : null;
-
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "#e6f7ff",
-          border: "1px solid #91d5ff",
-          padding: "8px 16px",
-          borderRadius: "12px",
-          zIndex: 1000,
-          fontWeight: "bold",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        🚗 <span>{helper.name} est en route pour vous aider</span>
-        {distance && <span>📏 Distance restante : {distance} km</span>}
-      </div>
-    );
-  }
-
-
-  return (
-    <MapContainer
-  center={userPosition}
-  zoom={13}
-  style={{ height: "500px", width: "100%", zIndex: 0 }}
-  scrollWheelZoom
->
-  <TileLayer
-    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-  />
-
-  <SetViewOnUser position={userPosition} />
-  {alertLocation && <FlyToLocation alert={alertLocation} />}
-
-  {/* === Bandeau suivi du solidaire === */}
-  {activeReport && activeReport.helperUid && (() => {
-    const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
-    if (!helper) return null;
-
-    const distance = helper.latitude && helper.longitude
-      ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
-      : null;
+    const distance =
+      helper.latitude && helper.longitude
+        ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
+        : null;
 
     return (
       <div
@@ -202,59 +163,72 @@ export default function MapView({
         {distance && <span>📏 Distance restante : {distance} km</span>}
       </div>
     );
-  })()}
+  }
 
-  {/* Utilisateur */}
-  <Marker position={userPosition} icon={currentUserIcon}>
-    <Popup>🙋‍♂️ Vous êtes ici</Popup>
-  </Marker>
+  return (
+    <MapContainer center={userPosition} zoom={13} style={{ height: "500px", width: "100%", zIndex: 0 }} scrollWheelZoom>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
 
-  {/* Reports */}
-  {reports.map((report) => (
-    <Marker
-      key={report.id}
-      position={[report.latitude, report.longitude]}
-      icon={reportIcon}
-      eventHandlers={{ click: () => onReportClick(report) }}
-    >
-      <Popup>
-        <strong>⚠️ Panne :</strong> {report.nature} <br />
-        {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
-      </Popup>
-    </Marker>
-  ))}
+      <SetViewOnUser position={userPosition} />
+      {alertLocation && <FlyToLocation alert={alertLocation} />}
+      <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
 
-  {/* Solidaires */}
-  {solidaires.map((s) => {
-    let status = "available"; // par défaut disponible
-
-    const isOffline = !s.online; // offline si pas connecté
-    const alertForSolidaire = activeReport
-      ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
-      : null;
-
-    if (isOffline) status = "offline";
-    else if (activeReport?.helperUid === s.uid && activeReport.status === "aide en cours") status = "busy";
-    else if (alertForSolidaire && alertForSolidaire.status !== "accepté") status = "alerted";
-
-    const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
-
-    return (
-      <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
-        <Popup>
-          <strong>👤 {s.name}</strong> <br />
-          Matériel : {s.materiel} <br />
-          📏 Distance : {distance} km <br />
-          {status === "available" && "✅ Disponible"}
-          {status === "offline" && "⚪ Indisponible"}
-          {status === "alerted" && "⏳ En attente de réponse"}
-          {status === "busy" && "⏳ Aide en cours"}
-          {status === "available" && s.uid !== currentUserUid && <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>}
-        </Popup>
+      {/* Utilisateur */}
+      <Marker position={userPosition} icon={currentUserIcon}>
+        <Popup>🙋‍♂️ Vous êtes ici</Popup>
       </Marker>
-    );
-  })}
-</MapContainer>
 
+      {/* Reports */}
+      {reports.map((report) => (
+        <Marker
+          key={report.id}
+          position={[report.latitude, report.longitude]}
+          icon={reportIcon}
+          eventHandlers={{ click: () => onReportClick(report) }}
+        >
+          <Popup>
+            <strong>⚠️ Panne :</strong> {report.nature} <br />
+            {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
+          </Popup>
+        </Marker>
+      ))}
+
+      {/* Solidaires */}
+      {solidaires.map((s) => {
+        let status = "available";
+        const isOffline = !s.online;
+        const alertForSolidaire = activeReport
+          ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
+          : null;
+
+        if (isOffline) status = "offline";
+        else if (activeReport?.helperUid === s.uid) {
+          if (activeReport.helperConfirmed && activeReport.status === "aide en cours") status = "busy";
+          else if (!activeReport.helperConfirmed && alertForSolidaire) status = "alerted";
+        }
+
+        const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
+
+        return (
+          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
+            <Popup>
+              <strong>👤 {s.name}</strong> <br />
+              Matériel : {s.materiel} <br />
+              📏 Distance : {distance} km <br />
+              {status === "available" && "✅ Disponible"}
+              {status === "offline" && "⚪ Indisponible"}
+              {status === "alerted" && "⏳ En attente de réponse"}
+              {status === "busy" && "⏳ Aide en cours"}
+              {status === "available" && s.uid !== currentUserUid && (
+                <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+              )}
+            </Popup>
+          </Marker>
+        );
+      })}
+    </MapContainer>
   );
 }
