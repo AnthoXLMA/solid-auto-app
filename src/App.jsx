@@ -367,8 +367,7 @@ export default function App() {
   </div>
 
 {/* Menu flottant style Waze compact */}
-<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-6 z-40 max-w-xs">
-
+<div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-6 z-40 max-w-xs">
   {/* Badge pannes actives */}
   <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     ⚡ {reports.length}
@@ -399,8 +398,19 @@ export default function App() {
   <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     👥 {onlineUsers}
   </span>
-
 </div>
+
+{/* Bouton + SUR la carte */}
+<button
+  onClick={() => setShowReportForm(true)}
+  className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
+             rounded-full shadow-2xl flex items-center justify-center
+             text-white text-4xl font-bold border-4 border-white
+             transition-transform transform hover:scale-110 z-50"
+>
+  +
+</button>
+
 
 
   {/* Bouton + SUR la carte */}
