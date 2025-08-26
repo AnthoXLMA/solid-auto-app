@@ -90,8 +90,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     await updateDoc(reportRef, {
       status: "aide en cours",
       helperUid: user.uid,
+      helperConfirmed: true,  // ✅ déclenche le bandeau côté sinistré
       frais: fraisAnnules ? 0 : montant,
-      // ✅ Champ pour déclencher le toast côté sinistré
       notificationForOwner: `🚨 Solidaire en route pour vous aider. Montant du dépannage : ${
         fraisAnnules ? "0 €" : montant + " €"
       }`,
