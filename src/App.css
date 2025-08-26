@@ -27,14 +27,27 @@
 }
 
 /* Forcer la map à rester en arrière-plan */
-.leaflet-container {
+.leaflet-container,
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom
+.leaflet-map-pane,
+.leaflet-tile-pane,
+.leaflet-overlay-pane,
+.leaflet-shadow-pane,
+.leaflet-marker-pane,
+.leaflet-tooltip-pane,
+.leaflet-popup-pane {
   z-index: 0 !important;
 }
 
-.leaflet-pane,
-.leaflet-top,
-.leaflet-bottom {
-  z-index: 0 !important;
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out forwards;
 }
 
 .pulse-badge {

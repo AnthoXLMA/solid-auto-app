@@ -84,7 +84,7 @@ function FlyToLocation({ alert }) {
 export default function MapView({
   reports = [],
   solidaires = [],
-  alerts = [],   // ✅ valeur par défaut tableau
+  alerts = [],
   userPosition,
   onReportClick,
   onAlertUser,
