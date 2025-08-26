@@ -1,45 +1,25 @@
-// Appelle ton backend pour créer un PaymentIntent Stripe
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Créer un paiement (bloquer les fonds)
 export const createPaymentIntent = async (reportId, amount) => {
-  try {
-    const response = await fetch("/api/create-payment-intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reportId, amount }),
-    });
-    const data = await response.json();
-    return data.clientSecret; // client_secret pour Stripe.js
-  } catch (err) {
-    console.error("Erreur Stripe:", err);
-    throw err;
-  }
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(amount * 100), // en centimes
+    currency: "eur",
+    metadata: { reportId },
+  });
+  return paymentIntent.client_secret;
 };
 
-// Capture le paiement côté backend (lorsque solidaire a terminé)
+// Capturer le paiement (libérer les fonds au solidaire)
 export const capturePayment = async (paymentIntentId) => {
-  try {
-    const response = await fetch("/api/capture-payment-intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentIntentId }),
-    });
-    return await response.json();
-  } catch (err) {
-    console.error("Erreur capture Stripe:", err);
-    throw err;
-  }
+  const intent = await stripe.paymentIntents.capture(paymentIntentId);
+  return intent;
 };
 
-// Rembourse le paiement (si annulation)
+// Rembourser le paiement (si le sinistré annule)
 export const refundPayment = async (paymentIntentId) => {
-  try {
-    const response = await fetch("/api/refund-payment-intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentIntentId }),
-    });
-    return await response.json();
-  } catch (err) {
-    console.error("Erreur remboursement Stripe:", err);
-    throw err;
-  }
+  const refund = await stripe.refunds.create({ payment_intent: paymentIntentId });
+  return refund;
 };
+
