@@ -7,6 +7,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  addDoc,
   getDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -45,33 +46,57 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
-  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
-    try {
-      const reportRef = doc(db, "reports", alerte.reportId);
-      const reportSnap = await getDoc(reportRef);
 
-      if (!reportSnap.exists()) {
-        await deleteDoc(doc(db, "alertes", alerte.id));
-        removeAlertWithAnimation(alerte.id);
-        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
-        return;
-      }
+const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
+  try {
+    const reportRef = doc(db, "reports", alerte.reportId);
+    const reportSnap = await getDoc(reportRef);
 
-      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-      await updateDoc(reportRef, {
-        status: "aide en cours",
-        helperUid: user.uid,
-        frais: fraisAnnules ? 0 : montant,
-      });
-
+    if (!reportSnap.exists()) {
+      await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
-      setAcceptModal({ isOpen: false, alerte: null });
-      toast.success("✅ Vous avez accepté d’aider !");
-    } catch (err) {
-      console.error("Erreur pricing :", err);
-      toast.error("❌ Erreur lors du calcul des frais.");
+      toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+      return;
     }
-  };
+
+    // Récupérer le propriétaire du report pour le notifier
+    const reportData = reportSnap.data();
+    const reportOwnerUid = reportData.ownerUid;
+
+    // 1️⃣ Mettre à jour la report et l'alerte
+    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+    await updateDoc(reportRef, {
+      status: "aide en cours",
+      helperUid: user.uid,
+      frais: fraisAnnules ? 0 : montant,
+    });
+
+    // 2️⃣ Supprimer l'alerte et fermer le modal
+    removeAlertWithAnimation(alerte.id);
+    setAcceptModal({ isOpen: false, alerte: null });
+
+    // 3️⃣ Notification toast côté solidaire et sinistré
+    toast.success("✅ Vous avez accepté d’aider !");
+    toast.info(
+      `🚨 Solidaire en route pour vous aider. Montant du dépannage : ${
+        fraisAnnules ? "0 €" : montant + " €"
+      }`
+    );
+
+    // 4️⃣ Créer un chat pour le report si besoin
+    const chatRef = collection(db, "chats");
+    await addDoc(chatRef, {
+      reportId: alerte.reportId,
+      participants: [user.uid, reportOwnerUid],
+      messages: [],
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error("Erreur pricing :", err);
+    toast.error("❌ Erreur lors du calcul des frais.");
+  }
+};
+
 
   const rejectAlert = async (alerte) => {
     try {
