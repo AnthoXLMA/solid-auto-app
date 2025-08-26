@@ -174,8 +174,8 @@ export default function MapView({
 
       <SetViewOnUser position={userPosition} />
       {alertLocation && <FlyToLocation alert={alertLocation} />}
+      {/* === Bandeau suivi du solidaire === */}
       <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
-
       {/* Utilisateur */}
       <Marker position={userPosition} icon={currentUserIcon}>
         <Popup>🙋‍♂️ Vous êtes ici</Popup>
