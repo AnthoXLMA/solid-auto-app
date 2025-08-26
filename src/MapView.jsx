@@ -6,7 +6,8 @@ import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 import PaymentBanner from "./PaymentBanner";
-
+import AcceptModal from "./AcceptModal";
+import InProgressModal from "./InProgressModal";
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -96,7 +97,13 @@ export default function MapView({
   cancelReport,
   currentUserUid,
 }) {
+  // === États pour modals ===
+  const [isAcceptOpen, setIsAcceptOpen] = useState(false);
+  const [isInProgressOpen, setIsInProgressOpen] = useState(false);
+  const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
+  const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // Suivi temps réel du report actif
   useEffect(() => {
@@ -137,7 +144,7 @@ export default function MapView({
       if (!helper || !helper.latitude || !helper.longitude) return;
       const dist = getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude);
       setDistanceToHelper(dist);
-    }, 5000); // toutes les 5 secondes
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [activeReport, solidaires, userPosition]);
@@ -153,116 +160,145 @@ export default function MapView({
     }
   }
 
+  // === Gestion ouverture modals ===
+  const handleStartRepair = (report) => {
+    setCurrentReport(report);
+    setIsInProgressOpen(true);
+  };
+
+  const handleConfirmPayment = (report, montant, fraisAnnules) => {
+    setCurrentReport(report);
+    setIsAcceptOpen(false);
+    setIsInProgressOpen(true); // ouverture du InProgressModal
+  };
+
   // Bandeau helper confirmé uniquement
   function HelperBanner({ activeReport, solidaires, userPosition }) {
-  if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
-  const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
-  if (!helper) return null;
+    if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
+    const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
+    if (!helper) return null;
 
-  const distance =
-    helper.latitude && helper.longitude
-      ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
-      : null;
+    const distance =
+      helper.latitude && helper.longitude
+        ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
+        : null;
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#e6f7ff",
+          border: "1px solid #91d5ff",
+          padding: "8px 16px",
+          borderRadius: "12px",
+          zIndex: 1000,
+          fontWeight: "bold",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        🚗 {helper.name} est en route pour vous aider
+        {distance && <span>📏 Distance restante : {distance} km</span>}
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 10,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "#e6f7ff",
-        border: "1px solid #91d5ff",
-        padding: "8px 16px",
-        borderRadius: "12px",
-        zIndex: 1000,
-        fontWeight: "bold",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
-      🚗 {helper.name} est en route pour vous aider
-      {distance && <span>📏 Distance restante : {distance} km</span>}
-    </div>
-  );
-}
-
-
-  return (
-    <MapContainer center={userPosition} zoom={13} style={{ height: "500px", width: "100%", zIndex: 0 }} scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <>
+      {/* === Modals === */}
+      <AcceptModal
+        isOpen={isAcceptOpen}
+        onClose={() => setIsAcceptOpen(false)}
+        alerte={currentReport}
+        onConfirm={handleConfirmPayment}
+      />
+      <InProgressModal
+        isOpen={isInProgressOpen}
+        onClose={() => setIsInProgressOpen(false)}
+        report={currentReport}
+        solidaire={currentUser}
+        onComplete={() => {}}
       />
 
-      <SetViewOnUser position={userPosition} />
-      {alertLocation && <FlyToLocation alert={alertLocation} />}
-      {activeReport?.helperConfirmed && activeReport.helperUid && (
-        <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
-      )}
-
-      {/* === Bandeau paiement (escrow) === */}
-      {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
-        <PaymentBanner
-          report={activeReport}
-          solidaire={solidaires.find(s => s.uid === activeReport.helperUid)}
+      {/* === Map === */}
+      <MapContainer center={userPosition} zoom={13} style={{ height: "500px", width: "100%", zIndex: 0 }} scrollWheelZoom>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-      )}
 
-      {/* Utilisateur */}
-      <Marker position={userPosition} icon={currentUserIcon}>
-        <Popup>🙋‍♂️ Vous êtes ici</Popup>
-      </Marker>
+        <SetViewOnUser position={userPosition} />
+        {alertLocation && <FlyToLocation alert={alertLocation} />}
+        {activeReport?.helperConfirmed && activeReport.helperUid && (
+          <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
+        )}
 
-      {/* Reports */}
-      {reports.map((report) => (
-        <Marker
-          key={report.id}
-          position={[report.latitude, report.longitude]}
-          icon={reportIcon}
-          eventHandlers={{ click: () => onReportClick(report) }}
-        >
-          <Popup>
-            <strong>⚠️ Panne :</strong> {report.nature} <br />
-            {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
-          </Popup>
+        {/* === Bandeau paiement (escrow) === */}
+        {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
+          <PaymentBanner
+            report={activeReport}
+            solidaire={solidaires.find(s => s.uid === activeReport.helperUid)}
+          />
+        )}
+
+        {/* Utilisateur */}
+        <Marker position={userPosition} icon={currentUserIcon}>
+          <Popup>🙋‍♂️ Vous êtes ici</Popup>
         </Marker>
-      ))}
 
-      {/* Solidaires */}
-      {solidaires.map((s) => {
-        let status = "available";
-        const isOffline = !s.online;
-        const alertForSolidaire = activeReport
-          ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
-          : null;
-
-        if (isOffline) status = "offline";
-        else if (activeReport?.helperUid === s.uid) {
-          if (activeReport.helperConfirmed && activeReport.status === "aide en cours") status = "busy";
-          else if (!activeReport.helperConfirmed && alertForSolidaire) status = "alerted";
-        }
-
-        const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
-
-        return (
-          <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
+        {/* Reports */}
+        {reports.map((report) => (
+          <Marker
+            key={report.id}
+            position={[report.latitude, report.longitude]}
+            icon={reportIcon}
+            eventHandlers={{ click: () => onReportClick(report) }}
+          >
             <Popup>
-              <strong>👤 {s.name}</strong> <br />
-              Matériel : {s.materiel} <br />
-              📏 Distance : {distance} km <br />
-              {status === "available" && "✅ Disponible"}
-              {status === "offline" && "⚪ Indisponible"}
-              {status === "alerted" && "⏳ En attente de réponse"}
-              {status === "busy" && "⏳ Aide en cours"}
-              {status === "available" && s.uid !== currentUserUid && (
-                <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
-              )}
+              <strong>⚠️ Panne :</strong> {report.nature} <br />
+              {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
             </Popup>
           </Marker>
-        );
-      })}
-    </MapContainer>
+        ))}
+
+        {/* Solidaires */}
+        {solidaires.map((s) => {
+          let status = "available";
+          const isOffline = !s.online;
+          const alertForSolidaire = activeReport
+            ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
+            : null;
+
+          if (isOffline) status = "offline";
+          else if (activeReport?.helperUid === s.uid) {
+            if (activeReport.helperConfirmed && activeReport.status === "aide en cours") status = "busy";
+            else if (!activeReport.helperConfirmed && alertForSolidaire) status = "alerted";
+          }
+
+          const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
+
+          return (
+            <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
+              <Popup>
+                <strong>👤 {s.name}</strong> <br />
+                Matériel : {s.materiel} <br />
+                📏 Distance : {distance} km <br />
+                {status === "available" && "✅ Disponible"}
+                {status === "offline" && "⚪ Indisponible"}
+                {status === "alerted" && "⏳ En attente de réponse"}
+                {status === "busy" && "⏳ Aide en cours"}
+                {status === "available" && s.uid !== currentUserUid && (
+                  <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+                )}
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MapContainer>
+    </>
   );
 }

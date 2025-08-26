@@ -12,41 +12,33 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import AcceptModal from "./AcceptModal";
+import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
 
-
-export default function AlertsListener({ user, setSelectedAlert }) {
+export default function AlertsListener({ user, currentSolidaire, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
+  const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
 
   // 🔥 Mise à jour du statut du solidaire quand il est en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
-
-    // par défaut il est dispo à la connexion
     updateDoc(userRef, { status: "disponible" }).catch(() => {});
-
-    return () => {
-      // à la déconnexion, on le met en "indisponible"
-      updateDoc(userRef, { status: "indisponible" }).catch(() => {});
-    };
+    return () => updateDoc(userRef, { status: "indisponible" }).catch(() => {});
   }, [user]);
 
+  // 🔔 Écoute des alertes pour le solidaire
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
 
-      // ⚡️ si au moins une alerte en attente → statut "en attente de réponse"
-      if (snapshot.docs.length > 0) {
-        updateDoc(doc(db, "users", user.uid), { status: "en attente de réponse" }).catch(() => {});
-      } else {
-        updateDoc(doc(db, "users", user.uid), { status: "disponible" }).catch(() => {});
-      }
+      const newStatus = snapshot.docs.length > 0 ? "en attente de réponse" : "disponible";
+      updateDoc(doc(db, "users", user.uid), { status: newStatus }).catch(() => {});
     });
     return () => unsub();
   }, [user]);
@@ -62,7 +54,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
   const acceptAlert = async (alerte) => {
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-      // ✅ statut passe en aide en cours dès acceptation
       await updateDoc(doc(db, "users", user.uid), { status: "aide en cours" });
       setAcceptModal({ isOpen: true, alerte });
     } catch (err) {
@@ -70,71 +61,69 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       toast.error("❌ Une erreur est survenue lors de l’acceptation.");
     }
   };
- const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
-  try {
-    const reportRef = doc(db, "reports", alerte.reportId);
-    const reportSnap = await getDoc(reportRef);
 
-    if (!reportSnap.exists()) {
-      await deleteDoc(doc(db, "alertes", alerte.id));
+  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
+    try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+
+      if (!reportSnap.exists()) {
+        await deleteDoc(doc(db, "alertes", alerte.id));
+        removeAlertWithAnimation(alerte.id);
+        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+        return;
+      }
+
+      const reportData = reportSnap.data();
+      const reportOwnerUid = reportData.ownerUid;
+
+      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+      await updateDoc(reportRef, {
+        status: "aide en cours",
+        helperUid: user.uid,
+        helperConfirmed: true,
+        frais: fraisAnnules ? 0 : montant,
+        notificationForOwner: `🚨 Solidaire en route pour vous aider. Montant du dépannage : ${
+          fraisAnnules ? "0 €" : montant + " €"
+        }`,
+      });
+
+      await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
+
+      // Supprimer alerte et fermer AcceptModal
       removeAlertWithAnimation(alerte.id);
-      toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
-      return;
+      setAcceptModal({ isOpen: false, alerte: null });
+
+      // Ouvrir InProgressModal pour le solidaire
+      setInProgressModal({ isOpen: true, report: reportData });
+
+      toast.success("✅ Vous avez accepté d’aider !");
+
+      // Créer chat pour ce report
+      const chatRef = collection(db, "chats");
+      await addDoc(chatRef, {
+        reportId: alerte.reportId,
+        participants: [user.uid, reportOwnerUid],
+        messages: [],
+        createdAt: new Date(),
+      });
+    } catch (err) {
+      console.error("Erreur pricing :", err);
+      toast.error("❌ Erreur lors du calcul des frais.");
     }
-
-    const reportData = reportSnap.data();
-    const reportOwnerUid = reportData.ownerUid;
-
-    // 1️⃣ Mettre à jour la report et l'alerte côté solidaire
-    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-    await updateDoc(reportRef, {
-      status: "aide en cours",
-      helperUid: user.uid,
-      helperConfirmed: true,  // ✅ déclenche le bandeau côté sinistré
-      frais: fraisAnnules ? 0 : montant,
-      notificationForOwner: `🚨 Solidaire en route pour vous aider. Montant du dépannage : ${
-        fraisAnnules ? "0 €" : montant + " €"
-      }`,
-    });
-
-    await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
-
-    // 2️⃣ Supprimer l'alerte et fermer le modal
-    removeAlertWithAnimation(alerte.id);
-    setAcceptModal({ isOpen: false, alerte: null });
-
-    // 3️⃣ Notification toast côté solidaire uniquement pour confirmation
-    toast.success("✅ Vous avez accepté d’aider !");
-
-    // 4️⃣ Créer un chat pour le report si besoin
-    const chatRef = collection(db, "chats");
-    await addDoc(chatRef, {
-      reportId: alerte.reportId,
-      participants: [user.uid, reportOwnerUid],
-      messages: [],
-      createdAt: new Date(),
-    });
-  } catch (err) {
-    console.error("Erreur pricing :", err);
-    toast.error("❌ Erreur lors du calcul des frais.");
-  }
-};
+  };
 
   const rejectAlert = async (alerte) => {
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
       const reportSnap = await getDoc(reportRef);
 
-      if (reportSnap.exists()) {
-        await updateDoc(reportRef, { status: "aide refusée" });
-      }
+      if (reportSnap.exists()) await updateDoc(reportRef, { status: "aide refusée" });
 
       await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
 
-      // ⛔️ Rejet → retour au statut dispo
       await updateDoc(doc(db, "users", user.uid), { status: "disponible" });
-
       await updateUserStatus(user.uid, "disponible", true, null);
 
       toast.info("❌ Vous avez rejeté l’alerte.");
@@ -142,6 +131,11 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       console.error("Erreur rejet :", err);
       toast.error("❌ Une erreur est survenue lors du rejet.");
     }
+  };
+
+  const handleReleasePayment = async (reportId) => {
+    // 🔹 Ici, on pourrait appeler releaseEscrow(reportId)
+    console.log("💸 Paiement libéré pour report :", reportId);
   };
 
   return (
@@ -153,6 +147,14 @@ export default function AlertsListener({ user, setSelectedAlert }) {
         onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
         alerte={acceptModal.alerte}
         onConfirm={handleConfirmPricing}
+      />
+
+      <InProgressModal
+        isOpen={inProgressModal.isOpen}
+        onClose={() => setInProgressModal({ isOpen: false, report: null })}
+        report={inProgressModal.report}
+        solidaire={currentSolidaire}
+        onComplete={handleReleasePayment}
       />
 
       {alerts.length === 0 ? (
