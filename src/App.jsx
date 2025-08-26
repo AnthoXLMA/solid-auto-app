@@ -24,7 +24,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import useReportsListener from "./useReportsListener";
 import PayButton from "./PayButton";
-
+import { updateUserStatus } from "./userService";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -90,6 +90,23 @@ export default function App() {
     };
     createFakeUsers();
   }, []);
+
+  useEffect(() => {
+  // Écoute l’état de l’authentification
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (currentUser) {
+      // L’utilisateur vient de se connecter → dispo + online
+      await updateUserStatus(currentUser.uid, "disponible", true, null);
+    } else {
+      // Il se déconnecte → offline
+      if (auth.currentUser) {
+        await updateUserStatus(auth.currentUser.uid, "disponible", false, null);
+      }
+    }
+  });
+
+  return () => unsubscribe(); // cleanup
+}, []);
 
   // Écoute alertes pour l'utilisateur
   useEffect(() => {
@@ -203,7 +220,6 @@ export default function App() {
       if (pendingAlertsCount > 0) status = "alerted";
       return { ...s, alreadyAlerted, pendingAlertsCount, status };
     });
-
 
   // Alerter un solidaire
   const onAlertUser = async (solidaire) => {

@@ -13,6 +13,8 @@ import {
 import { db } from "./firebase";
 import AcceptModal from "./AcceptModal";
 import { toast } from "react-toastify";
+import { updateUserStatus } from "./userService";
+
 
 export default function AlertsListener({ user, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
@@ -93,6 +95,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
         frais: fraisAnnules ? 0 : montant,
       });
 
+      await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
+
       // 2️⃣ Supprimer l'alerte et fermer le modal
       removeAlertWithAnimation(alerte.id);
       setAcceptModal({ isOpen: false, alerte: null });
@@ -133,6 +137,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
       // ⛔️ Rejet → retour au statut dispo
       await updateDoc(doc(db, "users", user.uid), { status: "disponible" });
+
+      await updateUserStatus(user.uid, "disponible", true, null);
 
       toast.info("❌ Vous avez rejeté l’alerte.");
     } catch (err) {
