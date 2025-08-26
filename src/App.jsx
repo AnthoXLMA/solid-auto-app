@@ -209,21 +209,6 @@ export default function App() {
     }
   };
 
-//   const handleAlertUser = async (solidaire) => {
-//   try {
-//     await addDoc(collection(db, "alerts"), {
-//       fromUid: currentUser.uid,
-//       toUid: solidaire.uid,
-//       reportId: activeReport?.id,
-//       createdAt: serverTimestamp(),
-//     });
-//     toast.success(`🚨 ${solidaire.name} a été alerté !`);
-//   } catch (err) {
-//     console.error("Erreur en alertant :", err);
-//     toast.error("❌ Impossible d'alerter ce solidaire");
-//   }
-// };
-
     // Annuler un report (seulement si c'est le sien)
   const cancelReport = async (reportId) => {
     if (!user) return;
