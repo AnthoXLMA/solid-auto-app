@@ -27,7 +27,6 @@ import PayButton from "./PayButton";
 import { updateUserStatus } from "./userService";
 import { useNavigate } from "react-router-dom";
 
-
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState(null);
@@ -37,7 +36,9 @@ export default function App() {
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [showReportForm, setShowReportForm] = useState(false);
-
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(0);
+  const [page, setPage] = useState("map"); // valeur par défaut
   const userReports = useReportsListener(user);
 
   // Auth
@@ -122,12 +123,43 @@ export default function App() {
   }, [user]);
 
   // Écoute solidaires en temps réel
+  // useEffect(() => {
+  //   const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
+  //     setSolidaires(snapshot.docs.map((doc) => doc.data()));
+  //   });
+  //   return () => unsub();
+  // }, []);
+
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
-      setSolidaires(snapshot.docs.map((doc) => doc.data()));
+  const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
+    const allSolidaires = snapshot.docs.map((doc) => doc.data());
+    setSolidaires(allSolidaires);
+
+    // Nombre de solidaires en ligne
+    const onlineCount = allSolidaires.filter((s) => s.online).length;
+    setOnlineUsers(onlineCount);
+  });
+  return () => unsub();
+}, []);
+
+
+  useEffect(() => {
+  if (!user) return;
+  const q = collection(db, "chats");
+  const unsub = onSnapshot(q, (snapshot) => {
+    let count = 0;
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.participants.includes(user.uid)) {
+        count += data.messages?.filter((m) => !m.read && m.toUid === user.uid).length || 0;
+      }
     });
-    return () => unsub();
-  }, []);
+    setUnreadMessages(count);
+  });
+  return () => unsub();
+}, [user]);
+
+
 
   // Online / Offline
   useEffect(() => {
@@ -202,6 +234,11 @@ export default function App() {
 
   //Fonction Navigate pour la redirection des icones du menu flottan
   const navigate = useNavigate();
+
+  const navigateTo = (path) => {
+    navigate(`/${path}`);
+    console.log("Naviguer vers :", page);
+  };
 
   // Création de report
   const handleNewReport = async (newReport) => {
@@ -311,96 +348,110 @@ export default function App() {
         </button>
       </header>
 
-      <main className="flex-1 relative bg-gray-100">
-        {/* Carte occupe tout */}
-        <div className="absolute inset-0">
-          <MapView
-            reports={reports}
-            solidaires={filteredSolidaires}
-            alerts={alerts}
-            userPosition={currentPosition}
-            onPositionChange={setCurrentPosition}
-            onReportClick={setActiveReport}
-            onAlertUser={onAlertUser}
-            activeReport={activeReport}
-            selectedAlert={selectedAlert}
-            cancelReport={cancelReport}
-            currentUserUid={user.uid}
-          />
-        </div>
+  <main className="flex-1 relative bg-gray-100">
+  {/* Carte occupe tout */}
+  <div className="absolute inset-0">
+    <MapView
+      reports={reports}
+      solidaires={filteredSolidaires}
+      alerts={alerts}
+      userPosition={currentPosition}
+      onPositionChange={setCurrentPosition}
+      onReportClick={setActiveReport}
+      onAlertUser={onAlertUser}
+      activeReport={activeReport}
+      selectedAlert={selectedAlert}
+      cancelReport={cancelReport}
+      currentUserUid={user.uid}
+    />
+  </div>
 
-        <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-between items-center z-40">
-          <span>👥 {solidaires.filter(s => s.online).length} utilisateurs en ligne</span>
-          <span>⚡ {reports.length} pannes actives</span>
-        </div>
+{/* Menu flottant style Waze compact */}
+<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-6 z-40 max-w-xs">
 
-        <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-around items-center z-40">
-          <button onClick={() => navigate("/map")} className="flex flex-col items-center">
-            🗺️
-            <span className="text-xs">Carte</span>
-          </button>
-          <button onClick={() => navigate("/chat")} className="flex flex-col items-center">
-            💬
-            <span className="text-xs">Chat</span>
-          </button>
-          <button onClick={() => navigate("/feed")} className="flex flex-col items-center">
-            📰
-            <span className="text-xs">Feed</span>
-          </button>
-          <button onClick={() => setShowReportForm(true)} className="flex flex-col items-center">
-            ➕
-            <span className="text-xs">Ajouter</span>
-          </button>
-        </div>
+  {/* Badge pannes actives */}
+  <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+    ⚡ {reports.length}
+  </span>
 
-        {/* Bouton + SUR la carte */}
-        <button
-          onClick={() => setShowReportForm(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
-                     rounded-full shadow-2xl flex items-center justify-center
-                     text-white text-4xl font-bold border-4 border-white
-                     transition-transform transform hover:scale-110 z-50"
-        >
-          +
-        </button>
+  {/* Boutons principaux */}
+  <button onClick={() => navigateTo("map")} className="flex flex-col items-center">
+    🗺️
+    <span className="text-xs mt-1">Carte</span>
+  </button>
 
-        {/* Bottom sheet : Report Form */}
-        {showReportForm && (
-        <div className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40`}>
-            <ReportForm
-              userPosition={currentPosition}
-              onNewReport={(r) => {
-                handleNewReport(r);
-                setShowReportForm(false);
-              }}
-            />
-            <button
-              onClick={() => setShowReportForm(false)}
-              className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
-            >
-              Fermer
-            </button>
-          </div>
-        )}
+  <button onClick={() => navigateTo("chat")} className="flex flex-col items-center relative">
+    💬
+    <span className="text-xs mt-1">Chat</span>
+    {unreadMessages > 0 && (
+      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+        {unreadMessages}
+      </span>
+    )}
+  </button>
 
-        {/* Bottom sheet : Alertes */}
-        {user && alerts.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
-            <AlertsListener
-              user={user}
-              setSelectedAlert={setSelectedAlert}
-              userPosition={currentPosition}
-            />
-          </div>
-        )}
+  <button onClick={() => navigateTo("feed")} className="flex flex-col items-center">
+    📰
+    <span className="text-xs mt-1">Feed</span>
+  </button>
 
-        {/* Paiement : affiché comme une card flottante */}
-        {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
-          <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
-            <PayButton report={activeReport} />
-          </div>
-        )}
-      </main>
+  {/* Badge utilisateurs en ligne */}
+  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+    👥 {onlineUsers}
+  </span>
+
+</div>
+
+
+  {/* Bouton + SUR la carte */}
+  <button
+    onClick={() => setShowReportForm(true)}
+    className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
+               rounded-full shadow-2xl flex items-center justify-center
+               text-white text-4xl font-bold border-4 border-white
+               transition-transform transform hover:scale-110 z-50"
+  >
+    +
+  </button>
+
+  {/* Bottom sheet : Report Form */}
+  {showReportForm && (
+    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
+      <ReportForm
+        userPosition={currentPosition}
+        onNewReport={(r) => {
+          handleNewReport(r);
+          setShowReportForm(false);
+        }}
+      />
+      <button
+        onClick={() => setShowReportForm(false)}
+        className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
+      >
+        Fermer
+      </button>
+    </div>
+  )}
+
+  {/* Bottom sheet : Alertes */}
+  {user && alerts.length > 0 && (
+    <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
+      <AlertsListener
+        user={user}
+        setSelectedAlert={setSelectedAlert}
+        userPosition={currentPosition}
+      />
+    </div>
+  )}
+
+  {/* Paiement : affiché comme une card flottante */}
+  {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
+    <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
+      <PayButton report={activeReport} />
+    </div>
+  )}
+</main>
+
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
         © {new Date().getFullYear()} U-Boto - Tous droits réservés
