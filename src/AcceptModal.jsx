@@ -1,9 +1,18 @@
 import React, { useState } from "react";
 
-export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
+export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
   const [montant, setMontant] = useState(0);
 
   if (!isOpen || !alerte) return null;
+
+  const handleConfirm = (fraisAnnules) => {
+    // 1️⃣ Mettre à jour le paiement / frais côté backend
+    onConfirm(alerte, fraisAnnules ? 0 : montant, fraisAnnules);
+    // 2️⃣ Fermer le modal actuel
+    onClose();
+    // 3️⃣ Lancer le modal solidaire en cours
+    if (onStartRepair) onStartRepair(alerte);
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
@@ -27,13 +36,13 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm }) {
 
         <div className="flex gap-2 mb-4">
           <button
-            onClick={() => { onConfirm(alerte, montant, false); onClose(); }}
+            onClick={() => handleConfirm(false)}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             ✅ Conserver les frais
           </button>
           <button
-            onClick={() => { onConfirm(alerte, 0, true); onClose(); }}
+            onClick={() => handleConfirm(true)}
             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
           >
             🙌 Annuler les frais
