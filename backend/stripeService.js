@@ -1,25 +1,31 @@
+// stripeService.js
 import Stripe from "stripe";
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Créer un paiement (bloquer les fonds)
-export const createPaymentIntent = async (reportId, amount) => {
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(amount * 100), // en centimes
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2022-11-15",
+});
+
+/**
+ * Créer un PaymentIntent en mode "manual" (escrow)
+ */
+export const createPaymentIntent = async (amount) => {
+  return await stripe.paymentIntents.create({
+    amount,
     currency: "eur",
-    metadata: { reportId },
+    capture_method: "manual", // ⚠️ très important pour l’escrow
   });
-  return paymentIntent.client_secret;
 };
 
-// Capturer le paiement (libérer les fonds au solidaire)
-export const capturePayment = async (paymentIntentId) => {
-  const intent = await stripe.paymentIntents.capture(paymentIntentId);
-  return intent;
+/**
+ * Capturer un paiement (libérer au solidaire)
+ */
+export const capturePaymentIntent = async (paymentIntentId) => {
+  return await stripe.paymentIntents.capture(paymentIntentId);
 };
 
-// Rembourser le paiement (si le sinistré annule)
-export const refundPayment = async (paymentIntentId) => {
-  const refund = await stripe.refunds.create({ payment_intent: paymentIntentId });
-  return refund;
+/**
+ * Rembourser un paiement
+ */
+export const refundPaymentIntent = async (paymentIntentId) => {
+  return await stripe.refunds.create({ payment_intent: paymentIntentId });
 };
-
