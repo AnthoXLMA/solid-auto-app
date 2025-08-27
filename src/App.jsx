@@ -28,7 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { FaGlobe, FaCommentDots, FaBook } from "react-icons/fa";
 import Chat from "./Chat";
 import { useRef } from "react";
-
+import ProfileForm from "./ProfileForm";
 
 
 export default function App() {
@@ -48,7 +48,8 @@ export default function App() {
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
   const [isInProgressOpen, setIsInProgressOpen] = useState(false);
   const [showHelperList, setShowHelperList] = useState(false);
-
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showProfileForm, setShowProfileForm] = useState(false);
 
   // Auth
   useEffect(() => {
@@ -384,15 +385,43 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow">
-        <h1 className="text-xl font-bold">Bienvenue {user.email}</h1>
+<header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
+  <h1 className="text-xl font-bold">Bienvenue {user.username}</h1>
+
+  <div className="relative">
+    <button
+      onClick={() => setShowProfileMenu((prev) => !prev)}
+      className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg"
+    >
+      {user.username ? user.username[0].toUpperCase() : "U"}
+    </button>
+
+    {showProfileMenu && (
+      <div className="absolute right-0 mt-2 w-48 bg-white text-black shadow-lg rounded-lg z-50">
+        <div className="px-4 py-2 border-b font-medium">
+          {user.username || "Utilisateur"}
+        </div>
+        <button
+          onClick={() => {
+            setShowProfileForm(true);
+            setShowProfileMenu(false); // ferme le menu quand on clique sur éditer
+          }}
+          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+        >
+          Éditer profil
+        </button>
         <button
           onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+          className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
         >
           Se déconnecter
         </button>
-      </header>
+      </div>
+    )}
+  </div>
+</header>
+
+
 
   <main className="flex-1 relative bg-gray-100">
   {/* Carte occupe tout */}
@@ -414,6 +443,12 @@ export default function App() {
       setShowHelperList={setShowHelperList}
     />
   </div>
+
+
+  {showProfileForm && (
+  <ProfileForm user={user} onClose={() => setShowProfileForm(false)} />
+)}
+
 
 {/* Menu flottant style Instagram avec bouton + centré responsive */}
 <div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 sm:py-5 md:py-6 flex justify-between items-center z-50">
