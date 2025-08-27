@@ -42,7 +42,9 @@ export default function App() {
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [page, setPage] = useState("map"); // valeur par défaut
   const userReports = useReportsListener(user);
- const mapRef = useRef(null);
+  const mapRef = useRef(null);
+  const [isAcceptOpen, setIsAcceptOpen] = useState(false);
+  const [isInProgressOpen, setIsInProgressOpen] = useState(false);
 
 
   // Auth
@@ -408,9 +410,8 @@ export default function App() {
     />
   </div>
 
-{/* Menu flottant style Waze compact */}
-<div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-4 z-40 max-w-xs">
-
+{/* Menu flottant style Instagram */}
+<div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 flex justify-around items-center z-50">
   {/* Badge pannes actives */}
   <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     ⚡ {reports.length}
@@ -443,10 +444,7 @@ export default function App() {
   </button>
 
   {/* Feed */}
-  <button
-    onClick={() => navigateTo("feed")}
-    className="flex flex-col items-center"
-  >
+  <button onClick={() => navigateTo("feed")} className="flex flex-col items-center">
     <FaBook size={24} />
     <span className="text-xs mt-1">Feed</span>
   </button>
@@ -455,15 +453,8 @@ export default function App() {
   <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     👥 {onlineUsers}
   </span>
-
-  {/* PayButton : visible uniquement si paiement requis */}
-  {activeReport?.helperConfirmed && activeReport.frais > 0 && (
-    <div className="flex flex-col items-center">
-      <PayButton report={activeReport} />
-    </div>
-  )}
-
 </div>
+
 
 
 {/* Bouton + SUR la carte */}
