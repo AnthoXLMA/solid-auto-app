@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
 
 export default function ReportForm({ userPosition, onNewReport, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
+  const carouselRef = useRef(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -21,35 +22,75 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
     setMessage("");
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-fade-in">
-        <h3 className="text-center text-xl font-bold mb-6">Signaler une panne</h3>
+  // Gestion swipe
+  const handleTouchStart = useRef(null);
+  const startX = useRef(0);
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX;
+  };
+
+  const onTouchEnd = (e) => {
+    const diff = e.changedTouches[0].clientX - startX.current;
+    if (diff > 50) slidePrev();
+    if (diff < -50) slideNext();
+  };
+
+  const slideNext = () => {
+    const index = PANNE_TYPES.findIndex((p) => p.value === nature);
+    const nextIndex = (index + 1) % PANNE_TYPES.length;
+    setNature(PANNE_TYPES[nextIndex].value);
+  };
+
+  const slidePrev = () => {
+    const index = PANNE_TYPES.findIndex((p) => p.value === nature);
+    const prevIndex = (index - 1 + PANNE_TYPES.length) % PANNE_TYPES.length;
+    setNature(PANNE_TYPES[prevIndex].value);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-center items-end bg-black/50 p-4">
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden
+                   max-h-[90vh] animate-fade-in"
+        style={{ marginBottom: "120px" }}
+      >
+        <h3 className="text-center text-xl font-bold p-4 border-b">Signaler une panne</h3>
+
+        {/* Carousel swipe */}
+        <div
+          ref={carouselRef}
+          className="flex overflow-hidden p-4"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           {PANNE_TYPES.map((p) => (
             <div
               key={p.value}
               onClick={() => setNature(p.value)}
-              className={`flex flex-col items-center justify-center p-3 h-24 rounded-lg border cursor-pointer transition-transform transform hover:scale-105 ${
+              className={`flex-shrink-0 flex flex-col items-center justify-center w-40 h-40 p-4 m-2 rounded-lg border cursor-pointer transition-transform ${
                 nature === p.value ? "border-blue-600 bg-blue-50" : "border-gray-300 bg-white"
               }`}
             >
-              <div className="text-3xl mb-2">{p.icon}</div>
-              <div className="text-xs text-center font-medium">{p.label}</div>
+              <div className="text-4xl mb-2">{p.icon}</div>
+              <div className="text-center font-medium">{p.label}</div>
             </div>
           ))}
         </div>
 
-        <textarea
-          placeholder="Ajoutez un message (optionnel)"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          className="w-full p-3 border rounded-lg mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-          rows={3}
-        />
+        {/* Contenu scrollable */}
+        <div className="px-4 flex-1 overflow-y-auto">
+          <textarea
+            placeholder="De quoi avez vous besoin?"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 mb-4"
+            rows={3}
+          />
+        </div>
 
-        <div className="flex gap-3">
+        {/* Footer avec boutons */}
+        <div className="flex gap-3 p-4 border-t">
           <button
             type="button"
             onClick={onClose}
