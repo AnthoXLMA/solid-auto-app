@@ -2,14 +2,13 @@ import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } f
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { onSnapshot, doc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 import PaymentBanner from "./PaymentBanner";
 import PayButton from "./PayButton";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
-
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -137,8 +136,15 @@ const MapView = forwardRef(({
             helperConfirmed: data.helperConfirmed,
           });
 
+          // Toast pour solidaire en route
           if (data.helperConfirmed && !activeReport.helperConfirmed) {
             toast.info(`🚗 ${data.helperName} est en route pour vous aider`);
+          }
+
+          // Ouvrir InProgressModal uniquement si l'aide a commencé
+          if (data.helperConfirmed && data.status === "aide en cours") {
+            setCurrentReport({ ...activeReport, ...data });
+            setIsInProgressOpen(true);
           }
         }
       }
@@ -180,18 +186,6 @@ const MapView = forwardRef(({
         return (!isOffline && hasRequiredMateriel) || alertForSolidaire;
       })
     : solidaires;
-
-  // Gestion ouverture modals
-  const handleStartRepair = (report) => {
-    setCurrentReport(report);
-    setIsInProgressOpen(true);
-  };
-
-  const handleConfirmPayment = (report, montant, fraisAnnules) => {
-    setCurrentReport(report);
-    setIsAcceptOpen(false);
-    setIsInProgressOpen(true);
-  };
 
   // Bandeau helper confirmé uniquement
   function HelperBanner({ activeReport, solidaires, userPosition }) {
@@ -237,7 +231,11 @@ const MapView = forwardRef(({
         isOpen={isAcceptOpen}
         onClose={() => setIsAcceptOpen(false)}
         alerte={currentReport}
-        onConfirm={handleConfirmPayment}
+        onConfirm={(report, montant, fraisAnnules) => {
+          setCurrentReport(report);
+          setIsAcceptOpen(false);
+          setIsInProgressOpen(true);
+        }}
       />
       <InProgressModal
         isOpen={isInProgressOpen}
@@ -266,7 +264,6 @@ const MapView = forwardRef(({
           <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
         )}
 
-        {/* Bandeau paiement */}
         {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
           <PaymentBanner
             report={activeReport}
