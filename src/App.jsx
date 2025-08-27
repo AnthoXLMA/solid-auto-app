@@ -197,7 +197,7 @@ export default function App() {
         doc(db, "solidaires", user.uid),
         {
           uid: user.uid,
-          name: user.email,
+          name: user.name || user.email, // <-- garde le nom existant
           latitude: currentPosition[0],
           longitude: currentPosition[1],
           materiel: user.materiel || "batterie",
@@ -385,10 +385,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
-        <h1 className="text-xl font-bold">Bienvenue {user.name || user.username || user.email}</h1>
-          <button className="w-10 h-10 rounded-full ...">
-            {user.username ? user.username[0].toUpperCase() : "U"}
-          </button>
+        <h1 className="text-xl font-bold">Bienvenue { user.username || user.email}</h1>
         <div className="relative">
           <button
             onClick={() => setShowProfileMenu((prev) => !prev)}
@@ -447,10 +444,22 @@ export default function App() {
 
   {showProfileForm && (
   <ProfileForm
-  user={user}
-  onClose={() => setShowProfileForm(false)}
-  onUpdate={(updatedUser) => setUser(updatedUser)}
-/>
+    user={user}
+    onClose={() => setShowProfileForm(false)}
+    onUpdate={(updatedUser) => {
+    // Créer un objet propre pour Firestore
+      const sanitizedUser = {
+        uid: updatedUser.uid,
+        name: updatedUser.name,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        materiel: updatedUser.materiel,
+      };
+
+      setUser(sanitizedUser); // met à jour le state local
+      setDoc(doc(db, "solidaires", sanitizedUser.uid), sanitizedUser, { merge: true });
+    }}
+  />
 )}
 
 
@@ -527,9 +536,6 @@ export default function App() {
   </div>
 </div>
 
-
-
-
   {/* Bottom sheet : Report Form */}
   {showReportForm && (
     <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
@@ -539,6 +545,7 @@ export default function App() {
           handleNewReport(r);
           setShowReportForm(false);
         }}
+      onClose={() => setShowReportForm(false)}
       />
       <button
         onClick={() => setShowReportForm(false)}

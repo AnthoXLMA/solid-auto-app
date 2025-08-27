@@ -15,23 +15,22 @@ import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
-import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowService";
+import { createEscrow, releaseEscrow } from "./services/escrowService";
 import HelpBanner from "./HelpBanner";
-
 
 export default function AlertsListener({ user, currentSolidaire, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
-  const [paymentStatus, setPaymentStatus] = useState(null); // pour suivre l’escrow
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // 🔥 Statut du solidaire en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
-    updateDoc(userRef, { status: "disponible" }).catch(() => {});
-    return () => updateDoc(userRef, { status: "indisponible" }).catch(() => {});
+    updateDoc(userRef, { status: "disponible" }).catch(console.error);
+    return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
   }, [user]);
 
   // 🔔 Écoute des alertes
@@ -39,9 +38,13 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
-      setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      const newStatus = snapshot.docs.length > 0 ? "en attente de réponse" : "disponible";
-      updateDoc(doc(db, "users", user.uid), { status: newStatus }).catch(() => {});
+      const sorted = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      setAlerts(sorted);
+
+      const newStatus = sorted.length > 0 ? "en attente de réponse" : "disponible";
+      updateDoc(doc(db, "users", user.uid), { status: newStatus }).catch(console.error);
     });
     return () => unsub();
   }, [user]);
@@ -55,6 +58,7 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
   };
 
   const acceptAlert = async (alerte) => {
+    if (alerte.status === "accepté" || alerte.status === "refusé") return;
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(doc(db, "users", user.uid), { status: "aide en cours" });
@@ -80,39 +84,34 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
       const reportData = reportSnap.data();
       const reportOwnerUid = reportData.ownerUid;
 
-      // Mise à jour des statuts côté Firebase
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(reportRef, {
         status: "aide en cours",
         helperUid: user.uid,
         helperConfirmed: true,
         frais: fraisAnnules ? 0 : montant,
-        notificationForOwner: `🚨 Solidaire en route pour vous aider. Montant du dépannage : ${
+        notificationForOwner: `🚨 Solidaire en route ! Montant : ${
           fraisAnnules ? "0 €" : montant + " €"
         }`,
       });
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      // 1️⃣ Créer l’escrow pour bloquer l’argent
+      // 🔹 Créer l’escrow pour bloquer l’argent
       await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
 
-      // 2️⃣ Supprimer l’alerte et fermer AcceptModal
       removeAlertWithAnimation(alerte.id);
       setAcceptModal({ isOpen: false, alerte: null });
-
-      // 3️⃣ Ouvrir le modal InProgress pour le solidaire
       setInProgressModal({ isOpen: true, report: reportData });
 
-      toast.success("✅ Vous avez accepté d’aider !");
-
-      // 4️⃣ Créer un chat pour ce report
-      const chatRef = collection(db, "chats");
-      await addDoc(chatRef, {
+      // 🔹 Créer un chat pour ce report
+      await addDoc(collection(db, "chats"), {
         reportId: alerte.reportId,
         participants: [user.uid, reportOwnerUid],
         messages: [],
         createdAt: new Date(),
       });
+
+      toast.success("✅ Vous avez accepté d’aider !");
     } catch (err) {
       console.error("Erreur pricing :", err);
       toast.error("❌ Erreur lors du calcul des frais.");
@@ -120,6 +119,7 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
   };
 
   const rejectAlert = async (alerte) => {
+    if (alerte.status === "accepté" || alerte.status === "refusé") return;
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
       const reportSnap = await getDoc(reportRef);
@@ -140,75 +140,88 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
   };
 
   const handleReleasePayment = async (reportId) => {
-    // 🔹 Libérer le paiement via escrow
     await releaseEscrow(reportId, setPaymentStatus);
     setInProgressModal({ isOpen: false, report: null });
   };
 
+  const statusColor = (status) => {
+    switch (status) {
+      case "accepté":
+        return "#d1e7dd"; // vert clair
+      case "refusé":
+        return "#f8d7da"; // rouge clair
+      default:
+        return "#fff3cd"; // jaune clair
+    }
+  };
+
   return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+        <h4 className="mb-4 font-semibold text-lg">📢 Mes alertes reçues</h4>
 
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-11/12">
-        <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
-      <h4>📢 Mes alertes reçues</h4>
+        <AcceptModal
+          isOpen={acceptModal.isOpen}
+          onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+          alerte={acceptModal.alerte}
+          onConfirm={handleConfirmPricing}
+        />
 
-      <AcceptModal
-        isOpen={acceptModal.isOpen}
-        onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
-        alerte={acceptModal.alerte}
-        onConfirm={handleConfirmPricing}
-      />
+        <InProgressModal
+          isOpen={inProgressModal.isOpen}
+          onClose={() => setInProgressModal({ isOpen: false, report: null })}
+          report={inProgressModal.report}
+          solidaire={currentSolidaire}
+          onComplete={handleReleasePayment}
+        />
 
-      <InProgressModal
-        isOpen={inProgressModal.isOpen}
-        onClose={() => setInProgressModal({ isOpen: false, report: null })}
-        report={inProgressModal.report}
-        solidaire={currentSolidaire}
-        onComplete={handleReleasePayment}
-      />
+        <HelpBanner
+          report={inProgressModal.report}
+          onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
+        />
 
-      <HelpBanner
-        report={inProgressModal.report}
-        onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
-      />
-
-      {alerts.length === 0 ? (
-        <p>Aucune alerte pour l’instant</p>
-      ) : (
-        <ul>
-          {alerts.map((a) => (
-            <div
-              style={{
-                border: "1px solid #ccc",
-                borderRadius: "8px",
-                padding: "12px",
-                marginBottom: "12px",
-                background: "#fff",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
-              }}
-            >
-              <h5>🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}</h5>
-              <p>📍 À {a.distance || "?"} km de vous</p>
-              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                <button onClick={() => setSelectedAlert(a)}>📍 Voir sur la carte</button>
-                <button
-                  style={{ background: "green", color: "#fff", padding: "6px 10px", borderRadius: "6px" }}
-                  onClick={() => acceptAlert(a)}
-                >
-                  ✅ Accepter
-                </button>
-                <button
-                  style={{ background: "red", color: "#fff", padding: "6px 10px", borderRadius: "6px" }}
-                  onClick={() => rejectAlert(a)}
-                >
-                  ❌ Refuser
-                </button>
-              </div>
-            </div>
-          ))}
-        </ul>
-      )}
-    </div>
+        {alerts.length === 0 ? (
+          <p>Aucune alerte pour l’instant</p>
+        ) : (
+          <ul className="space-y-3">
+            {alerts.map((a) => (
+              <li
+                key={a.id}
+                className="p-3 rounded-lg shadow-sm"
+                style={{ backgroundColor: statusColor(a.status) }}
+              >
+                <h5 className="font-medium">
+                  🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}
+                </h5>
+                <p>📍 À {a.distance || "?"} km de vous</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                    onClick={() => setSelectedAlert(a)}
+                  >
+                    📍 Voir sur la carte
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
+                    onClick={() => acceptAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ✅ Accepter
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
+                    onClick={() => rejectAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ❌ Refuser
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
