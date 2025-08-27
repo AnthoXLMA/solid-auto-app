@@ -269,22 +269,34 @@ export default function App() {
 
   // Filtrage solidaires pour report actif
   const filteredSolidaires = solidaires
-    .filter((s) => s.uid !== user?.uid) // 🔥 exclure le Current User
-    .map((s) => {
-      if (!activeReport) return { ...s, status: "normal" };
-      const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
-      const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
-      const isRelevant =
-        s.materiel &&
-        activeReport.nature &&
-        s.materiel.toLowerCase().includes(activeReport.nature.toLowerCase());
+  .filter((s) => s.uid !== user?.uid) // 🔥 exclure le Current User
+  .map((s) => {
+    if (!activeReport) return { ...s, status: "normal" };
 
-      let status = "irrelevant";
-      if (alreadyAlerted) status = "alerted";
-      else if (isRelevant) status = "relevant";
-      if (pendingAlertsCount > 0) status = "alerted";
-      return { ...s, alreadyAlerted, pendingAlertsCount, status };
-    });
+    const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
+    const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+
+    // ✅ Assurer que materiel est toujours un tableau de strings
+    const materielArray = Array.isArray(s.materiel)
+      ? s.materiel
+      : typeof s.materiel === "string"
+      ? [s.materiel]
+      : [];
+
+    // ✅ Vérifier compatibilité
+    const isRelevant =
+      activeReport.nature &&
+      materielArray.some((m) =>
+        m.toLowerCase().includes(activeReport.nature.toLowerCase())
+      );
+
+    let status = "irrelevant";
+    if (alreadyAlerted) status = "alerted";
+    else if (isRelevant) status = "relevant";
+    if (pendingAlertsCount > 0) status = "alerted";
+
+    return { ...s, alreadyAlerted, pendingAlertsCount, status };
+  });
 
   // Alerter un solidaire
   const onAlertUser = async (solidaire) => {
