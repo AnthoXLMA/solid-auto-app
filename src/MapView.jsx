@@ -6,6 +6,7 @@ import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 import PaymentBanner from "./PaymentBanner";
+import PayButton from "./PayButton";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 
@@ -227,6 +228,8 @@ const MapView = forwardRef(({
     );
   }
 
+  const canPay = activeReport?.helperConfirmed && activeReport?.status === "aide en cours" && activeReport?.frais > 0;
+
   return (
     <>
       {/* Modals */}
@@ -270,6 +273,8 @@ const MapView = forwardRef(({
             solidaire={solidaires.find(s => s.uid === activeReport.helperUid)}
           />
         )}
+
+        {canPay && <PayButton report={activeReport} />}
 
         {/* Utilisateur */}
         <Marker position={userPosition} icon={currentUserIcon}>
