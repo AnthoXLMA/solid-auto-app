@@ -1,9 +1,9 @@
 // src/services/escrowService.js
 
-const API_URL = "http://localhost:4242"; // adapte si backend déployé
+const API_URL = "http://localhost:4242";
 
-// Simule un escrow pour bloquer la somme (stock en mémoire ici)
-const escrows = {}; // ⚠️ en prod → stocker en DB
+// Stock temporaire des escrows (en mémoire)
+const escrows = {}; // En prod → stocker en DB
 
 /**
  * 1️⃣ Créer un séquestre (paiement en attente)
@@ -15,8 +15,10 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
     const res = await fetch(`${API_URL}/create-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reportId, amount: amount * 100 }), // Stripe attend les montants en centimes
+      body: JSON.stringify({ reportId, amount: Math.round(amount * 100) }), // Stripe attend les centimes
     });
+
+    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
 
     const data = await res.json();
     if (!data.clientSecret) throw new Error("Erreur lors de la création du paiement");
@@ -28,10 +30,11 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
     };
 
     console.log("✅ Escrow créé pour report:", reportId);
-    return data.clientSecret; // utilisé côté Stripe Checkout
+    return { success: true, clientSecret: data.clientSecret, status: "pending" };
   } catch (err) {
-    console.error(err);
+    console.error("❌ createEscrow:", err.message);
     setPaymentStatus("error");
+    return { success: false, error: err.message };
   }
 };
 
@@ -49,17 +52,21 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
       body: JSON.stringify({ paymentIntentId: escrow.paymentIntentId }),
     });
 
+    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+
     const data = await res.json();
     if (data.success) {
       escrow.status = "released";
       setPaymentStatus("released");
       console.log("💸 Paiement libéré pour report:", reportId);
+      return { success: true, status: "released" };
     } else {
       throw new Error(data.error || "Erreur release-payment");
     }
   } catch (err) {
-    console.error(err);
+    console.error("❌ releaseEscrow:", err.message);
     setPaymentStatus("error");
+    return { success: false, error: err.message };
   }
 };
 
@@ -77,16 +84,20 @@ export const refundEscrow = async (reportId, setPaymentStatus) => {
       body: JSON.stringify({ paymentIntentId: escrow.paymentIntentId }),
     });
 
+    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+
     const data = await res.json();
     if (data.success) {
       escrow.status = "refunded";
       setPaymentStatus("refunded");
       console.log("🔄 Paiement remboursé pour report:", reportId);
+      return { success: true, status: "refunded" };
     } else {
       throw new Error(data.error || "Erreur refund-payment");
     }
   } catch (err) {
-    console.error(err);
+    console.error("❌ refundEscrow:", err.message);
     setPaymentStatus("error");
+    return { success: false, error: err.message };
   }
 };

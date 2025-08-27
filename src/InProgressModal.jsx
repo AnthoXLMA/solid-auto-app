@@ -1,8 +1,30 @@
 // src/components/InProgressModal.jsx
-import React from "react";
+import React, { useState } from "react";
+import { releaseEscrow } from "./services/escrowService";
+import { toast } from "react-toastify";
 
-export default function InProgressModal({ isOpen, onClose, report, solidaire, onComplete }) {
+export default function InProgressModal({ isOpen, onClose, report, solidaire, setPaymentStatus, onComplete }) {
+  const [loading, setLoading] = useState(false);
+
   if (!isOpen || !report || !solidaire) return null;
+
+  const handleComplete = async () => {
+    try {
+      setLoading(true);
+      setPaymentStatus?.("releasing");
+
+      await releaseEscrow(report.id, setPaymentStatus);
+
+      toast.success("💸 Paiement libéré !");
+      onComplete?.(report.id);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error("❌ Erreur lors de la libération du paiement");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
@@ -17,10 +39,13 @@ export default function InProgressModal({ isOpen, onClose, report, solidaire, on
 
         <div className="flex gap-2 mt-4">
           <button
-            onClick={() => { onComplete(report.id); onClose(); }}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            onClick={handleComplete}
+            disabled={loading}
+            className={`flex-1 px-4 py-2 rounded-lg text-white transition ${
+              loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+            }`}
           >
-            ✅ Terminer le dépannage
+            ✅ {loading ? "Libération en cours..." : "Terminer le dépannage"}
           </button>
           <button
             onClick={onClose}

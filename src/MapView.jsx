@@ -160,6 +160,16 @@ export default function MapView({
     }
   }
 
+const filteredSolidaires = activeReport
+  ? solidaires.filter((s) => {
+      const isAvailable = s.online && (!activeReport.helperUid || s.uid !== activeReport.helperUid);
+      const hasRequiredMateriel = activeReport.materiel ? s.materiel?.includes(activeReport.materiel) : true;
+      return isAvailable && hasRequiredMateriel;
+    })
+  : solidaires; // avant signalement : tous les utilisateurs
+
+
+
   // === Gestion ouverture modals ===
   const handleStartRepair = (report) => {
     setCurrentReport(report);
@@ -225,7 +235,7 @@ export default function MapView({
       />
 
       {/* === Map === */}
-      <MapContainer center={userPosition} zoom={13} style={{ height: "500px", width: "100%", zIndex: 0 }} scrollWheelZoom>
+      <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%", zIndex: 0 }} scrollWheelZoom>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -266,7 +276,7 @@ export default function MapView({
         ))}
 
         {/* Solidaires */}
-        {solidaires.map((s) => {
+        {filteredSolidaires.map((s) => {
           let status = "available";
           const isOffline = !s.online;
           const alertForSolidaire = activeReport
@@ -295,6 +305,16 @@ export default function MapView({
                   <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
                 )}
               </Popup>
+              {status === "available" && s.uid !== currentUserUid && (
+                <button
+                  onClick={() => {
+                    onAlertUser(s);
+                    toast.info(`⚡ Alerte envoyée à ${s.name}`);
+                  }}
+                >
+                  ⚡ Alerter
+                </button>
+              )}
             </Marker>
           );
         })}
