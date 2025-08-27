@@ -1,14 +1,30 @@
-// src/ProfileForm.jsx
 import React, { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
-import { Box, TextField, Button, Select, MenuItem, InputLabel, FormControl, Typography } from "@mui/material";
+import {
+  Box,
+  TextField,
+  Button,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Typography,
+  Checkbox,
+  ListItemText,
+} from "@mui/material";
 import { toast } from "react-toastify";
 
 export default function ProfileForm({ user, onClose, onUpdate }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [materiel, setMateriel] = useState("");
+  const [materiel, setMateriel] = useState([]); // tableau pour matériel multiple
+
+  const PANNE_OPTIONS = [
+    { value: "pinces", label: "🔋 Pinces (Batterie)" },
+    { value: "cric", label: "🛞 Cric (Pneu)" },
+    { value: "jerrican", label: "⛽ Jerrican (Carburant)" },
+  ];
 
   // Chargement des données Firestore
   useEffect(() => {
@@ -22,7 +38,7 @@ export default function ProfileForm({ user, onClose, onUpdate }) {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setUsername(data.username || "");
-        setMateriel(data.materiel || "");
+        setMateriel(Array.isArray(data.materiel) ? data.materiel : [data.materiel] || []);
       }
     };
     fetchUserData();
@@ -30,28 +46,22 @@ export default function ProfileForm({ user, onClose, onUpdate }) {
 
   // Sauvegarde des modifications
   const handleSave = async () => {
-    if (!username || !materiel) {
+    if (!username || materiel.length === 0) {
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
     try {
       const docRef = doc(db, "users", user.uid);
       await updateDoc(docRef, { username, materiel });
-if (onUpdate) onUpdate({ ...user, username, materiel });
+      if (onUpdate) onUpdate({ ...user, username, materiel });
+
       toast.success("Profil mis à jour ✅");
-
-      // ⚡ Met à jour le state parent
-      if (onUpdate) {
-        onUpdate({ ...user, username, materiel });
-      }
-
       onClose();
     } catch (error) {
       console.error("Erreur lors de la mise à jour du profil:", error);
       toast.error("Erreur lors de la mise à jour du profil");
     }
   };
-
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -88,10 +98,22 @@ if (onUpdate) onUpdate({ ...user, username, materiel });
 
         <FormControl fullWidth sx={{ mb: 2 }}>
           <InputLabel>Matériel disponible *</InputLabel>
-          <Select value={materiel} onChange={(e) => setMateriel(e.target.value)} required>
-            <MenuItem value="pinces">🔋 Pinces (Batterie)</MenuItem>
-            <MenuItem value="cric">🛞 Cric (Pneu)</MenuItem>
-            <MenuItem value="jerrican">⛽ Jerrican (Carburant)</MenuItem>
+          <Select
+            multiple
+            value={materiel}
+            onChange={(e) => setMateriel(e.target.value)}
+            renderValue={(selected) =>
+              selected
+                .map((val) => PANNE_OPTIONS.find((o) => o.value === val)?.label)
+                .join(", ")
+            }
+          >
+            {PANNE_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                <Checkbox checked={materiel.includes(option.value)} />
+                <ListItemText primary={option.label} />
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 
@@ -102,7 +124,7 @@ if (onUpdate) onUpdate({ ...user, username, materiel });
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={!username || !materiel}
+            disabled={!username || materiel.length === 0}
             fullWidth
             sx={{ ml: 1 }}
           >

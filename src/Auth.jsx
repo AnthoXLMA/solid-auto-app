@@ -1,7 +1,24 @@
 import React, { useState } from "react";
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, db } from "./firebase";
+import {
+  auth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  db,
+} from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Paper } from "@mui/material";
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Paper,
+  Checkbox,
+  ListItemText,
+} from "@mui/material";
 import zxcvbn from "zxcvbn";
 
 export default function Auth({ setUser }) {
@@ -9,17 +26,19 @@ export default function Auth({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [materiel, setMateriel] = useState("pinces");
+  const [materiel, setMateriel] = useState([]); // tableau pour matériel multiple
   const [passwordStrength, setPasswordStrength] = useState(null);
+
+  const PANNE_OPTIONS = [
+    { value: "pinces", label: "🔋 Pinces (Batterie)" },
+    { value: "cric", label: "🛞 Cric (Pneu)" },
+    { value: "jerrican", label: "⛽ Jerrican (Carburant)" },
+  ];
 
   const handlePasswordChange = (e) => {
     const val = e.target.value;
     setPassword(val);
-    if (val) {
-      setPasswordStrength(zxcvbn(val).score);
-    } else {
-      setPasswordStrength(null);
-    }
+    setPasswordStrength(val ? zxcvbn(val).score : null);
   };
 
   const handleLogin = async () => {
@@ -46,7 +65,7 @@ export default function Auth({ setUser }) {
         uid: user.uid,
         email: user.email,
         username,
-        materiel,
+        materiel, // maintenant tableau
         online: true,
         latitude: null,
         longitude: null,
@@ -121,10 +140,22 @@ export default function Auth({ setUser }) {
         {mode === "signup" && (
           <FormControl fullWidth>
             <InputLabel>Matériel disponible</InputLabel>
-            <Select value={materiel} onChange={(e) => setMateriel(e.target.value)}>
-              <MenuItem value="pinces">🔋 Pinces (Batterie)</MenuItem>
-              <MenuItem value="cric">🛞 Cric (Pneu)</MenuItem>
-              <MenuItem value="jerrican">⛽ Jerrican (Carburant)</MenuItem>
+            <Select
+              multiple
+              value={materiel}
+              onChange={(e) => setMateriel(e.target.value)}
+              renderValue={(selected) =>
+                selected
+                  .map((val) => PANNE_OPTIONS.find((o) => o.value === val)?.label)
+                  .join(", ")
+              }
+            >
+              {PANNE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  <Checkbox checked={materiel.includes(option.value)} />
+                  <ListItemText primary={option.label} />
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         )}
