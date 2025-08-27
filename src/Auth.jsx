@@ -1,6 +1,6 @@
-// src/Auth.jsx
 import React, { useState } from "react";
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "./firebase";
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, db } from "./firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Paper } from "@mui/material";
 import zxcvbn from "zxcvbn";
 
@@ -8,23 +8,20 @@ export default function Auth({ setUser }) {
   const [mode, setMode] = useState("login"); // "login" ou "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [username, setUsername] = useState(""); // 🔹 Nom utilisateur
-  const [materiel, setMateriel] = useState("pinces"); // 🔹 Matériel disponible
+  const [username, setUsername] = useState("");
+  const [materiel, setMateriel] = useState("pinces");
   const [passwordStrength, setPasswordStrength] = useState(null);
 
-  // Gestion de la saisie mot de passe
   const handlePasswordChange = (e) => {
     const val = e.target.value;
     setPassword(val);
     if (val) {
-      const strength = zxcvbn(val).score;
-      setPasswordStrength(strength);
+      setPasswordStrength(zxcvbn(val).score);
     } else {
       setPasswordStrength(null);
     }
   };
 
-  // Connexion
   const handleLogin = async () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -35,7 +32,6 @@ export default function Auth({ setUser }) {
     }
   };
 
-  // Inscription
   const handleSignup = async () => {
     if (!username) {
       alert("Veuillez saisir un nom d'utilisateur.");
@@ -43,12 +39,24 @@ export default function Auth({ setUser }) {
     }
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Créer document Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        username,
+        materiel,
+        online: true,
+        latitude: null,
+        longitude: null,
+      });
+
       setUser({
-        ...userCredential.user,
+        ...user,
         username,
         materiel,
       });
-      // 🔹 Ici on pourrait stocker username et materiel dans Firestore si besoin
     } catch (error) {
       console.error(error);
       alert("Erreur lors de la création de compte : " + error.message);
@@ -87,17 +95,9 @@ export default function Auth({ setUser }) {
           onChange={handlePasswordChange}
         />
 
-        {/* Barre de force du mot de passe */}
         {mode === "signup" && passwordStrength !== null && (
           <Box sx={{ mt: 1 }}>
-            <Box
-              sx={{
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: "#eee",
-                overflow: "hidden",
-              }}
-            >
+            <Box sx={{ height: 8, borderRadius: 4, backgroundColor: "#eee", overflow: "hidden" }}>
               <Box
                 sx={{
                   width: `${(passwordStrength + 1) * 20}%`,
@@ -129,15 +129,13 @@ export default function Auth({ setUser }) {
           </FormControl>
         )}
 
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="contained"
-            onClick={mode === "login" ? handleLogin : handleSignup}
-            fullWidth
-          >
-            {mode === "login" ? "Se connecter" : "Créer un compte"}
-          </Button>
-        </Box>
+        <Button
+          variant="contained"
+          onClick={mode === "login" ? handleLogin : handleSignup}
+          fullWidth
+        >
+          {mode === "login" ? "Se connecter" : "Créer un compte"}
+        </Button>
 
         <Typography variant="body2" align="center" sx={{ mt: 1 }}>
           {mode === "login" ? (
