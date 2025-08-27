@@ -162,12 +162,16 @@ export default function MapView({
 
 const filteredSolidaires = activeReport
   ? solidaires.filter((s) => {
-      const isAvailable = s.online && (!activeReport.helperUid || s.uid !== activeReport.helperUid);
+      const isOffline = !s.online;
       const hasRequiredMateriel = activeReport.materiel ? s.materiel?.includes(activeReport.materiel) : true;
-      return isAvailable && hasRequiredMateriel;
-    })
-  : solidaires; // avant signalement : tous les utilisateurs
+      const alertForSolidaire = alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid);
 
+      // On garde :
+      // - ceux qui ont le matériel requis ET sont disponibles
+      // - OU ceux qui ont été alertés pour cette panne
+      return (!isOffline && hasRequiredMateriel) || alertForSolidaire;
+    })
+  : solidaires; // avant signalement, tout le monde
 
 
   // === Gestion ouverture modals ===
@@ -302,19 +306,16 @@ const filteredSolidaires = activeReport
                 {status === "alerted" && "⏳ En attente de réponse"}
                 {status === "busy" && "⏳ Aide en cours"}
                 {status === "available" && s.uid !== currentUserUid && (
-                  <button onClick={() => onAlertUser(s)}>⚡ Alerter</button>
+                  <button
+                    onClick={() => {
+                      onAlertUser(s);
+                      toast.info(`⚡ Alerte envoyée à ${s.name}`);
+                    }}
+                  >
+                    ⚡ Alerter
+                  </button>
                 )}
               </Popup>
-              {status === "available" && s.uid !== currentUserUid && (
-                <button
-                  onClick={() => {
-                    onAlertUser(s);
-                    toast.info(`⚡ Alerte envoyée à ${s.name}`);
-                  }}
-                >
-                  ⚡ Alerter
-                </button>
-              )}
             </Marker>
           );
         })}
