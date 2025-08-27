@@ -23,11 +23,12 @@ export default function PayButton({ report }) {
   return (
     <>
       <button
-        onClick={() => setShowModal(true)}
-        className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-auto min-w-[140px] max-w-[200px]"
-      >
-        💳 Payer le dépannage
-      </button>
+  onClick={() => setShowModal(true)}
+  className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-auto max-w-[200px]"
+>
+  💳 Payer le dépannage
+</button>
+
 
       {showModal && (
         <ModalPortal onClose={() => setShowModal(false)}>
