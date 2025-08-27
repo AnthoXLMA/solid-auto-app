@@ -5,8 +5,8 @@ import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { Box, TextField, Button, Select, MenuItem, InputLabel, FormControl, Typography } from "@mui/material";
 import { toast } from "react-toastify";
 
-export default function ProfileForm({ user, onClose }) {
-  const [name, setName] = useState("");
+export default function ProfileForm({ user, onClose, onUpdate }) {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [materiel, setMateriel] = useState("");
 
@@ -15,12 +15,13 @@ export default function ProfileForm({ user, onClose }) {
     if (!user) return;
 
     setEmail(user.email);
+
     const fetchUserData = async () => {
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setName(data.name || "");
+        setUsername(data.username || "");
         setMateriel(data.materiel || "");
       }
     };
@@ -29,20 +30,28 @@ export default function ProfileForm({ user, onClose }) {
 
   // Sauvegarde des modifications
   const handleSave = async () => {
-    if (!name || !materiel) {
+    if (!username || !materiel) {
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
     try {
       const docRef = doc(db, "users", user.uid);
-      await updateDoc(docRef, { name, materiel });
+      await updateDoc(docRef, { username, materiel });
+if (onUpdate) onUpdate({ ...user, username, materiel });
       toast.success("Profil mis à jour ✅");
+
+      // ⚡ Met à jour le state parent
+      if (onUpdate) {
+        onUpdate({ ...user, username, materiel });
+      }
+
       onClose();
     } catch (error) {
       console.error("Erreur lors de la mise à jour du profil:", error);
       toast.error("Erreur lors de la mise à jour du profil");
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -62,9 +71,9 @@ export default function ProfileForm({ user, onClose }) {
 
         <TextField
           fullWidth
-          label="Nom *"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          label="Nom d'utilisateur *"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           sx={{ mb: 2 }}
           required
         />
@@ -93,7 +102,7 @@ export default function ProfileForm({ user, onClose }) {
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={!name || !materiel}
+            disabled={!username || !materiel}
             fullWidth
             sx={{ ml: 1 }}
           >
