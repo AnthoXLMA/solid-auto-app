@@ -409,62 +409,66 @@ export default function App() {
       ref={mapRef}
     />
   </div>
+{/* Menu flottant style Instagram avec bouton + centré */}
+<div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 flex justify-between items-center z-50">
+  {/* Gauche du menu */}
+  <div className="flex items-center space-x-4 ml-4">
+    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+      ⚡ {reports.length}
+    </span>
+    <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center">
+      <FaGlobe size={24} />
+      <span className="text-xs mt-1">Carte</span>
+    </button>
+  </div>
 
-{/* Menu flottant style Instagram */}
-<div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 pb-20 flex justify-around items-center z-50">
-  {/* Badge pannes actives */}
-  <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-    ⚡ {reports.length}
-  </span>
+  {/* Centre : bouton + */}
+  <div className="relative">
+    <button
+      onClick={() => setShowReportForm(true)}
+      className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-blue-600 hover:bg-blue-700
+                 rounded-full shadow-2xl flex items-center justify-center
+                 text-white text-4xl font-bold border-4 border-white
+                 transition-transform transform hover:scale-110 z-50"
+    >
+      +
+    </button>
+  </div>
 
-  {/* Carte */}
-  <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center">
-    <FaGlobe size={24} />
-    <span className="text-xs mt-1">Carte</span>
-  </button>
+  {/* Droite du menu */}
+  <div className="flex items-center space-x-4 mr-4">
+    {/* Chat */}
+    <button
+      onClick={() => {
+        if (activeReport?.helperConfirmed) {
+          navigateTo("chat");
+        } else {
+          toast.info("💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici.");
+        }
+      }}
+      className="flex flex-col items-center relative"
+    >
+      <FaCommentDots size={24} />
+      <span className="text-xs mt-1">Chat</span>
+      {unreadMessages > 0 && activeReport?.helperConfirmed && (
+        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+          {unreadMessages}
+        </span>
+      )}
+    </button>
 
-  {/* Chat */}
-  <button
-    onClick={() => {
-      if (activeReport?.helperConfirmed) {
-        navigateTo("chat");
-      } else {
-        toast.info("💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici.");
-      }
-    }}
-    className="flex flex-col items-center relative"
-  >
-    <FaCommentDots size={24} />
-    <span className="text-xs mt-1">Chat</span>
-    {unreadMessages > 0 && activeReport?.helperConfirmed && (
-      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
-        {unreadMessages}
-      </span>
-    )}
-  </button>
+    {/* Feed */}
+    <button onClick={() => navigateTo("feed")} className="flex flex-col items-center">
+      <FaBook size={24} />
+      <span className="text-xs mt-1">Feed</span>
+    </button>
 
-  {/* Feed */}
-  <button onClick={() => navigateTo("feed")} className="flex flex-col items-center">
-    <FaBook size={24} />
-    <span className="text-xs mt-1">Feed</span>
-  </button>
-
-  {/* Badge utilisateurs en ligne */}
-  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-    👥 {onlineUsers}
-  </span>
+    {/* Badge utilisateurs en ligne */}
+    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+      👥 {onlineUsers}
+    </span>
+  </div>
 </div>
-
-{/* Bouton + SUR la carte, légèrement au-dessus du menu */}
-<button
-  onClick={() => setShowReportForm(true)}
-  className="fixed bottom-24 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
-             rounded-full shadow-2xl flex items-center justify-center
-             text-white text-4xl font-bold border-4 border-white
-             transition-transform transform hover:scale-110 z-50"
->
-  +
-</button>
 
 
   {/* Bottom sheet : Report Form */}
