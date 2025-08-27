@@ -9,6 +9,8 @@ import PaymentBanner from "./PaymentBanner";
 import PayButton from "./PayButton";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
+import { getDistanceKm } from "./utils/distance";
+import ModalHelperList from "./ModalHelperList";
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -51,18 +53,30 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
 };
 
 // === Utilitaire distance (Haversine) ===
-function getDistanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return (R * c).toFixed(1);
-}
+// function getDistanceKm(lat1, lon1, lat2, lon2) {
+//   const R = 6371;
+//   const dLat = ((lat2 - lat1) * Math.PI) / 180;
+//   const dLon = ((lon2 - lon1) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos((lat1 * Math.PI) / 180) *
+//       Math.cos((lat2 * Math.PI) / 180) *
+//       Math.sin(dLon / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return (R * c).toFixed(1);
+// }
+
+const alertHelper = (helper) => {
+  // Ici tu mets ce que tu veux faire quand un solidaire est alerté
+  console.log("⚡ Alerte envoyée à", helper.name);
+
+  // Exemple basique : afficher une notification
+  toast.info(`⚡ Alerte envoyée à ${helper.name}`);
+
+  // Plus tard, tu pourras déclencher un enregistrement dans Firestore
+  // pour notifier le solidaire directement.
+};
+
 
 // Recentrage sur utilisateur
 function SetViewOnUser({ position }) {
@@ -97,7 +111,9 @@ const MapView = forwardRef(({
   activeReport,
   selectedAlert,
   cancelReport,
-  currentUserUid
+  currentUserUid,
+  showHelperList,
+  setShowHelperList
 }, ref) => {
   const mapRef = useRef(null);
 
@@ -115,6 +131,14 @@ const MapView = forwardRef(({
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
+  const availableHelpers = solidaires
+  .filter(s => s.materiel?.includes(activeReport?.materiel) && s.uid !== currentUserUid)
+  .sort(
+    (a, b) =>
+      getDistanceKm(userPosition[0], userPosition[1], a.latitude, a.longitude) -
+      getDistanceKm(userPosition[0], userPosition[1], b.latitude, b.longitude)
+  );
+
 
   // Suivi temps réel du report actif
   useEffect(() => {
@@ -244,6 +268,18 @@ const MapView = forwardRef(({
         solidaire={currentUser}
         onComplete={() => {}}
       />
+
+      {showHelperList && (
+  <ModalHelperList
+    helpers={availableHelpers}
+    userPosition={userPosition}
+    onAlert={(helper) => {
+      alertHelper(helper);
+      setShowHelperList(false);
+    }}
+    onClose={() => setShowHelperList(false)}
+  />
+)}
 
       {/* Map */}
       <MapContainer
