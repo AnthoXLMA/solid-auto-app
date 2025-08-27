@@ -15,14 +15,16 @@ import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
+import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowService";
 
 export default function AlertsListener({ user, currentSolidaire, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
+  const [paymentStatus, setPaymentStatus] = useState(null); // pour suivre l’escrow
 
-  // 🔥 Mise à jour du statut du solidaire quand il est en ligne
+  // 🔥 Statut du solidaire en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
@@ -30,13 +32,12 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
     return () => updateDoc(userRef, { status: "indisponible" }).catch(() => {});
   }, [user]);
 
-  // 🔔 Écoute des alertes pour le solidaire
+  // 🔔 Écoute des alertes
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-
       const newStatus = snapshot.docs.length > 0 ? "en attente de réponse" : "disponible";
       updateDoc(doc(db, "users", user.uid), { status: newStatus }).catch(() => {});
     });
@@ -77,6 +78,7 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
       const reportData = reportSnap.data();
       const reportOwnerUid = reportData.ownerUid;
 
+      // Mise à jour des statuts côté Firebase
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(reportRef, {
         status: "aide en cours",
@@ -87,19 +89,21 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
           fraisAnnules ? "0 €" : montant + " €"
         }`,
       });
-
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      // Supprimer alerte et fermer AcceptModal
+      // 1️⃣ Créer l’escrow pour bloquer l’argent
+      await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
+
+      // 2️⃣ Supprimer l’alerte et fermer AcceptModal
       removeAlertWithAnimation(alerte.id);
       setAcceptModal({ isOpen: false, alerte: null });
 
-      // Ouvrir InProgressModal pour le solidaire
+      // 3️⃣ Ouvrir le modal InProgress pour le solidaire
       setInProgressModal({ isOpen: true, report: reportData });
 
       toast.success("✅ Vous avez accepté d’aider !");
 
-      // Créer chat pour ce report
+      // 4️⃣ Créer un chat pour ce report
       const chatRef = collection(db, "chats");
       await addDoc(chatRef, {
         reportId: alerte.reportId,
@@ -134,8 +138,9 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
   };
 
   const handleReleasePayment = async (reportId) => {
-    // 🔹 Ici, on pourrait appeler releaseEscrow(reportId)
-    console.log("💸 Paiement libéré pour report :", reportId);
+    // 🔹 Libérer le paiement via escrow
+    await releaseEscrow(reportId, setPaymentStatus);
+    setInProgressModal({ isOpen: false, report: null });
   };
 
   return (
