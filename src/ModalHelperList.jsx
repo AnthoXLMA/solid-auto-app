@@ -33,16 +33,17 @@ export default function ModalHelperList({ helpers, onClose, userPosition, onAler
           </button>
 
           {/* Carte du helper */}
-          <div className="flex-1 mx-4 p-4 border rounded-2xl shadow flex flex-col items-center">
-            <div className="font-medium text-lg">{currentHelper.name}</div>
-            <div className="text-sm text-gray-500">
+          <div className="flex-1 mx-4 p-4 border rounded-2xl shadow flex flex-col items-center
+                          h-[250px] w-full max-w-xs overflow-y-auto">
+            <div className="font-medium text-lg text-center">{currentHelper.name}</div>
+            <div className="text-sm text-gray-500 text-center mt-2">
               Matériel: {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
             </div>
-            <div className="text-sm text-gray-400">Distance: {distance} km</div>
+            <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance} km</div>
 
             <button
               onClick={() => onAlert(currentHelper)}
-              className="mt-4 bg-blue-600 text-white px-3 py-1 rounded-lg"
+              className="mt-auto bg-blue-600 text-white px-3 py-1 rounded-lg"
               disabled={!activeReport}
               title={!activeReport ? "Vous devez avoir un signalement actif" : ""}
             >
