@@ -16,6 +16,8 @@ import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
 import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowService";
+import HelpBanner from "./HelpBanner";
+
 
 export default function AlertsListener({ user, currentSolidaire, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
@@ -162,33 +164,44 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
         onComplete={handleReleasePayment}
       />
 
+      <HelpBanner
+        report={inProgressModal.report}
+        onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
+      />
+
       {alerts.length === 0 ? (
         <p>Aucune alerte pour l’instant</p>
       ) : (
         <ul>
           {alerts.map((a) => (
-            <li
-              key={a.id}
-              className={removingIds.includes(a.id) ? "fade-out" : ""}
-              style={{ marginBottom: "8px", transition: "opacity 0.3s" }}
+            <div
+              style={{
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                padding: "12px",
+                marginBottom: "12px",
+                background: "#fff",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
+              }}
             >
-              🚨 {a.fromUid} vous demande de l’aide (report: {a.reportId})
-              <button onClick={() => setSelectedAlert(a)}>📍 Géolocaliser</button>
-              <button style={{ marginLeft: "10px" }} onClick={() => acceptAlert(a)}>
-                ✅ Proposer mon aide
-              </button>
-              <button
-                style={{
-                  marginLeft: "5px",
-                  cursor: "pointer",
-                  backgroundColor: "#f8d7da",
-                  border: "none",
-                }}
-                onClick={() => rejectAlert(a)}
-              >
-                ❌ Rejeter
-              </button>
-            </li>
+              <h5>🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}</h5>
+              <p>📍 À {a.distance || "?"} km de vous</p>
+              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <button onClick={() => setSelectedAlert(a)}>📍 Voir sur la carte</button>
+                <button
+                  style={{ background: "green", color: "#fff", padding: "6px 10px", borderRadius: "6px" }}
+                  onClick={() => acceptAlert(a)}
+                >
+                  ✅ Accepter
+                </button>
+                <button
+                  style={{ background: "red", color: "#fff", padding: "6px 10px", borderRadius: "6px" }}
+                  onClick={() => rejectAlert(a)}
+                >
+                  ❌ Refuser
+                </button>
+              </div>
+            </div>
           ))}
         </ul>
       )}
