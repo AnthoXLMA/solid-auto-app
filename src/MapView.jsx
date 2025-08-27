@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -8,6 +8,7 @@ import { db } from "./firebase";
 import PaymentBanner from "./PaymentBanner";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
+
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -85,7 +86,8 @@ function FlyToLocation({ alert }) {
   return null;
 }
 
-export default function MapView({
+// === Composant principal MapView avec forwardRef ===
+const MapView = forwardRef(({
   reports = [],
   solidaires = [],
   alerts = [],
@@ -95,15 +97,24 @@ export default function MapView({
   activeReport,
   selectedAlert,
   cancelReport,
-  currentUserUid,
-}) {
+  currentUserUid
+}, ref) => {
+  const mapRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    recenter: () => {
+      if (mapRef.current && userPosition) {
+        mapRef.current.setView(userPosition, 15);
+      }
+    },
+  }));
+
   // === États pour modals ===
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
   const [isInProgressOpen, setIsInProgressOpen] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
-  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // Suivi temps réel du report actif
   useEffect(() => {
@@ -125,7 +136,6 @@ export default function MapView({
             helperConfirmed: data.helperConfirmed,
           });
 
-          // Notification quand le solidaire confirme
           if (data.helperConfirmed && !activeReport.helperConfirmed) {
             toast.info(`🚗 ${data.helperName} est en route pour vous aider`);
           }
@@ -160,21 +170,17 @@ export default function MapView({
     }
   }
 
-const filteredSolidaires = activeReport
-  ? solidaires.filter((s) => {
-      const isOffline = !s.online;
-      const hasRequiredMateriel = activeReport.materiel ? s.materiel?.includes(activeReport.materiel) : true;
-      const alertForSolidaire = alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid);
+  const filteredSolidaires = activeReport
+    ? solidaires.filter((s) => {
+        const isOffline = !s.online;
+        const hasRequiredMateriel = activeReport.materiel ? s.materiel?.includes(activeReport.materiel) : true;
+        const alertForSolidaire = alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid);
 
-      // On garde :
-      // - ceux qui ont le matériel requis ET sont disponibles
-      // - OU ceux qui ont été alertés pour cette panne
-      return (!isOffline && hasRequiredMateriel) || alertForSolidaire;
-    })
-  : solidaires; // avant signalement, tout le monde
+        return (!isOffline && hasRequiredMateriel) || alertForSolidaire;
+      })
+    : solidaires;
 
-
-  // === Gestion ouverture modals ===
+  // Gestion ouverture modals
   const handleStartRepair = (report) => {
     setCurrentReport(report);
     setIsInProgressOpen(true);
@@ -183,7 +189,7 @@ const filteredSolidaires = activeReport
   const handleConfirmPayment = (report, montant, fraisAnnules) => {
     setCurrentReport(report);
     setIsAcceptOpen(false);
-    setIsInProgressOpen(true); // ouverture du InProgressModal
+    setIsInProgressOpen(true);
   };
 
   // Bandeau helper confirmé uniquement
@@ -223,7 +229,7 @@ const filteredSolidaires = activeReport
 
   return (
     <>
-      {/* === Modals === */}
+      {/* Modals */}
       <AcceptModal
         isOpen={isAcceptOpen}
         onClose={() => setIsAcceptOpen(false)}
@@ -238,8 +244,14 @@ const filteredSolidaires = activeReport
         onComplete={() => {}}
       />
 
-      {/* === Map === */}
-      <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%", zIndex: 0 }} scrollWheelZoom>
+      {/* Map */}
+      <MapContainer
+        center={userPosition}
+        zoom={13}
+        style={{ height: "100%", width: "100%", zIndex: 0 }}
+        ref={mapRef}
+        scrollWheelZoom
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -251,7 +263,7 @@ const filteredSolidaires = activeReport
           <HelperBanner activeReport={activeReport} solidaires={solidaires} userPosition={userPosition} />
         )}
 
-        {/* === Bandeau paiement (escrow) === */}
+        {/* Bandeau paiement */}
         {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
           <PaymentBanner
             report={activeReport}
@@ -274,7 +286,9 @@ const filteredSolidaires = activeReport
           >
             <Popup>
               <strong>⚠️ Panne :</strong> {report.nature} <br />
-              {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
+              {report.ownerUid === currentUserUid && (
+                <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
+              )}
             </Popup>
           </Marker>
         ))}
@@ -322,4 +336,8 @@ const filteredSolidaires = activeReport
       </MapContainer>
     </>
   );
-}
+});
+
+console.log({ PaymentBanner, AcceptModal, InProgressModal });
+
+export default MapView;
