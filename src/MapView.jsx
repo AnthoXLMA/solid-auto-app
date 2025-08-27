@@ -131,13 +131,14 @@ const MapView = forwardRef(({
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
-  const availableHelpers = solidaires
-  .filter(s => s.materiel?.includes(activeReport?.materiel) && s.uid !== currentUserUid)
-  .sort(
-    (a, b) =>
-      getDistanceKm(userPosition[0], userPosition[1], a.latitude, a.longitude) -
-      getDistanceKm(userPosition[0], userPosition[1], b.latitude, b.longitude)
-  );
+  const availableHelpers = solidaires.slice(0, 10); // les 10 premiers helpers, sans filtre
+  // const availableHelpers = solidaires
+  // .filter(s => s.materiel?.includes(activeReport?.materiel) && s.uid !== currentUserUid)
+  // .sort(
+  //   (a, b) =>
+  //     getDistanceKm(userPosition[0], userPosition[1], a.latitude, a.longitude) -
+  //     getDistanceKm(userPosition[0], userPosition[1], b.latitude, b.longitude)
+  // );
 
 
   // Suivi temps réel du report actif
@@ -270,16 +271,18 @@ const MapView = forwardRef(({
       />
 
       {showHelperList && (
-  <ModalHelperList
-    helpers={availableHelpers}
-    userPosition={userPosition}
-    onAlert={(helper) => {
-      alertHelper(helper);
-      setShowHelperList(false);
-    }}
-    onClose={() => setShowHelperList(false)}
-  />
-)}
+        <ModalHelperList
+          helpers={availableHelpers}
+          userPosition={userPosition}
+          activeReport={activeReport} // <-- on passe le report actif
+          onAlert={(helper) => {
+            if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !");
+            alertHelper(helper);
+            setShowHelperList(false);
+          }}
+          onClose={() => setShowHelperList(false)}
+        />
+      )}
 
       {/* Map */}
       <MapContainer
