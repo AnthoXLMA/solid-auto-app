@@ -1,11 +1,24 @@
 // src/components/InProgressModal.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { releaseEscrow } from "./services/escrowService";
 import { toast } from "react-toastify";
 
-export default function InProgressModal({ isOpen, onClose, report, solidaire, setPaymentStatus, onComplete }) {
+export default function InProgressModal({
+  isOpen,
+  onClose,
+  report,
+  solidaire,
+  setPaymentStatus,
+  onComplete,
+}) {
   const [loading, setLoading] = useState(false);
 
+  // Reset loading si le modal se ferme ou change de report/solidaire
+  useEffect(() => {
+    if (!isOpen) setLoading(false);
+  }, [isOpen, report, solidaire]);
+
+  // Ne rien afficher si props manquantes ou modal fermé
   if (!isOpen || !report || !solidaire) return null;
 
   const handleComplete = async () => {
@@ -17,7 +30,7 @@ export default function InProgressModal({ isOpen, onClose, report, solidaire, se
 
       toast.success("💸 Paiement libéré !");
       onComplete?.(report.id);
-      onClose();
+      onClose?.();
     } catch (err) {
       console.error(err);
       toast.error("❌ Erreur lors de la libération du paiement");
@@ -28,21 +41,35 @@ export default function InProgressModal({ isOpen, onClose, report, solidaire, se
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in relative">
         <h2 className="text-lg font-bold mb-4">Dépannage en cours</h2>
 
-        <p className="mb-2"><strong>Solidaire :</strong> {solidaire.name}</p>
-        <p className="mb-2"><strong>Sinistré :</strong> {report.ownerName || report.ownerEmail}</p>
-        <p className="mb-2"><strong>Montant :</strong> {report.frais} €</p>
-        <p className="mb-2"><strong>Localisation :</strong> {report.latitude}, {report.longitude}</p>
-        {report.materiel && <p className="mb-2"><strong>Matériel :</strong> {report.materiel}</p>}
+        <p className="mb-2">
+          <strong>Solidaire :</strong> {solidaire.name}
+        </p>
+        <p className="mb-2">
+          <strong>Sinistré :</strong> {report.ownerName || report.ownerEmail}
+        </p>
+        <p className="mb-2">
+          <strong>Montant :</strong> {report.frais} €
+        </p>
+        <p className="mb-2">
+          <strong>Localisation :</strong> {report.latitude}, {report.longitude}
+        </p>
+        {report.materiel && (
+          <p className="mb-2">
+            <strong>Matériel :</strong> {report.materiel}
+          </p>
+        )}
 
         <div className="flex gap-2 mt-4">
           <button
             onClick={handleComplete}
             disabled={loading}
             className={`flex-1 px-4 py-2 rounded-lg text-white transition ${
-              loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+              loading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
             }`}
           >
             ✅ {loading ? "Libération en cours..." : "Terminer le dépannage"}
