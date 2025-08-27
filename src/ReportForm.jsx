@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
-import ModalPortal from "./ModalPortal";
 
-export default function ReportForm({ userPosition, onNewReport }) {
-  const [showModal, setShowModal] = useState(false);
+export default function ReportForm({ userPosition, onNewReport, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
 
@@ -20,74 +18,54 @@ export default function ReportForm({ userPosition, onNewReport }) {
       address: "Adresse inconnue",
     });
 
-    setShowModal(false);
     setMessage("");
   };
 
   return (
-    <>
-      <button
-        onClick={() => setShowModal(true)}
-        style={{
-          padding: "10px 20px",
-          borderRadius: "8px",
-          border: "none",
-          background: "#007bff",
-          color: "#fff",
-          cursor: "pointer",
-        }}
-      >
-        🚨 Signaler une panne
-      </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-fade-in">
+        <h3 className="text-center text-xl font-bold mb-6">Signaler une panne</h3>
 
-      {showModal && (
-        <ModalPortal onClose={() => setShowModal(false)}>
-          <h3 style={{ textAlign: "center" }}>Type de panne</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 15 }}>
-            {PANNE_TYPES.map((p) => (
-              <div
-                key={p.value}
-                onClick={() => setNature(p.value)}
-                style={{
-                  width: 80,
-                  height: 80,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 12,
-                  border: nature === p.value ? "2px solid #007bff" : "1px solid #ccc",
-                  background: nature === p.value ? "#e6f0ff" : "#fff",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  textAlign: "center",
-                  fontSize: 14,
-                }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 5 }}>{p.icon}</div>
-                <div>{p.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <textarea
-              placeholder="Ajoutez un message (optionnel)"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              style={{ display: "block", width: "100%", padding: 6, borderRadius: 6, border: "1px solid #ccc", marginBottom: 10 }}
-            />
-            <div style={{ display: "flex", gap: 10 }}>
-              <button type="submit" style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: "#007bff", color: "#fff" }}>
-                Envoyer
-              </button>
-              <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc", background: "#f8f9fa" }}>
-                Annuler
-              </button>
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {PANNE_TYPES.map((p) => (
+            <div
+              key={p.value}
+              onClick={() => setNature(p.value)}
+              className={`flex flex-col items-center justify-center p-3 h-24 rounded-lg border cursor-pointer transition-transform transform hover:scale-105 ${
+                nature === p.value ? "border-blue-600 bg-blue-50" : "border-gray-300 bg-white"
+              }`}
+            >
+              <div className="text-3xl mb-2">{p.icon}</div>
+              <div className="text-xs text-center font-medium">{p.label}</div>
             </div>
-          </form>
-        </ModalPortal>
-      )}
-    </>
+          ))}
+        </div>
+
+        <textarea
+          placeholder="Ajoutez un message (optionnel)"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          className="w-full p-3 border rounded-lg mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+          rows={3}
+        />
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border bg-gray-200 hover:bg-gray-300 transition"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="flex-1 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+          >
+            Envoyer
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

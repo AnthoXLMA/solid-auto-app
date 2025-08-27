@@ -29,6 +29,8 @@ import { FaGlobe, FaCommentDots, FaBook } from "react-icons/fa";
 import Chat from "./Chat";
 import { useRef } from "react";
 
+
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState(null);
@@ -409,6 +411,7 @@ export default function App() {
       ref={mapRef}
     />
   </div>
+
 {/* Menu flottant style Instagram avec bouton + centré */}
 <div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 flex justify-between items-center z-50">
   {/* Gauche du menu */}
@@ -433,6 +436,18 @@ export default function App() {
     >
       +
     </button>
+    {/* Popup ReportForm */}
+    {showReportForm && (
+      <ReportForm
+        userPosition={currentPosition}
+        onNewReport={(r) => {
+          handleNewReport(r);
+          setShowReportForm(false); // ferme le modal après envoi
+        }}
+        onClose={() => setShowReportForm(false)} // ferme le modal via Annuler
+      />
+    )}
+
   </div>
 
   {/* Droite du menu */}
@@ -469,8 +484,6 @@ export default function App() {
     </span>
   </div>
 </div>
-
-
 
   {/* Bottom sheet : Report Form */}
   {showReportForm && (
