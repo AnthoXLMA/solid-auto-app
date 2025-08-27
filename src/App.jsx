@@ -47,6 +47,7 @@ export default function App() {
   const mapRef = useRef(null);
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
   const [isInProgressOpen, setIsInProgressOpen] = useState(false);
+  const [showHelperList, setShowHelperList] = useState(false);
 
 
   // Auth
@@ -409,6 +410,8 @@ export default function App() {
       cancelReport={cancelReport}
       currentUserUid={user.uid}
       ref={mapRef}
+      showHelperList={showHelperList}
+      setShowHelperList={setShowHelperList}
     />
   </div>
 
@@ -477,11 +480,17 @@ export default function App() {
       <FaBook size={24} />
       <span className="text-xs mt-1">Feed</span>
     </button>
-
-    {/* Badge utilisateurs en ligne */}
-    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-      👥 {onlineUsers}
-    </span>
+    {/*Menu flottant : clic sur icône utilisateurs*/}
+      <button
+          onClick={() => setShowHelperList(true)}
+          className="flex flex-col items-center"
+        >
+          👥
+          <span className="text-xs mt-1">Solidaires</span>
+          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+            {onlineUsers}
+          </span>
+        </button>
   </div>
 </div>
 
