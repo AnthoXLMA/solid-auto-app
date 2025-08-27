@@ -132,7 +132,7 @@ const MapView = forwardRef(({
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
-  const availableHelpers = solidaires.slice(0, 10); // les 10 premiers helpers, sans filtre
+
   // const availableHelpers = solidaires
   // .filter(s => s.materiel?.includes(activeReport?.materiel) && s.uid !== currentUserUid)
   // .sort(
@@ -207,14 +207,23 @@ const filteredSolidaires = activeReport
   ? solidaires.filter((s) => {
       const isOffline = !s.online;
 
-      // Vérifier si le solidaire a du matériel compatible avec la panne
-      const hasCompatibleMateriel = s.materiel?.some((m) => {
-        const matOption = MATERIEL_OPTIONS.find((o) => o.value === m);
-        return matOption?.compatible.includes(activeReport.nature);
-      });
+      // Toujours avoir un tableau
+      const solidaireMateriel = Array.isArray(s.materiel)
+        ? s.materiel
+        : typeof s.materiel === "string"
+        ? [s.materiel]
+        : [];
+
+      // Vérifier compatibilité uniquement si activeReport.nature existe
+      const hasCompatibleMateriel =
+        Boolean(activeReport.nature) &&
+        solidaireMateriel.some((m) => {
+          const matOption = MATERIEL_OPTIONS.find((o) => o.value === m);
+          return matOption?.compatible?.includes(activeReport.nature);
+        });
 
       // Vérifier si le solidaire a déjà été alerté pour ce report
-      const alertForSolidaire = alerts.find(
+      const alertForSolidaire = alerts.some(
         (a) => a.reportId === activeReport.id && a.toUid === s.uid
       );
 
@@ -223,7 +232,11 @@ const filteredSolidaires = activeReport
     })
   : solidaires;
 
-  // Bandeau helper confirmé uniquement
+
+
+  const availableHelpers = filteredSolidaires.slice(0, 10); // les 10 premiers helpers, sans filtre
+
+// Bandeau helper confirmé uniquement
   function HelperBanner({ activeReport, solidaires, userPosition }) {
     if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
     const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
@@ -361,11 +374,18 @@ const filteredSolidaires = activeReport
 
           const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
 
+          // 👉 ici tu ajoutes le comptage
+          const alertCount = alerts.filter((a) => a.toUid === s.uid).length;
+
           return (
-            <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status)}>
+            <Marker
+              key={s.uid}
+              position={[s.latitude, s.longitude]}
+              icon={getSolidaireIconWithBadge(status, alertCount)} // 👈 tu passes alertCount
+            >
               <Popup>
                 <strong>👤 {s.name}</strong> <br />
-                Matériel : {s.materiel} <br />
+                Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"} <br />
                 📏 Distance : {distance} km <br />
                 {status === "available" && "✅ Disponible"}
                 {status === "offline" && "⚪ Indisponible"}
