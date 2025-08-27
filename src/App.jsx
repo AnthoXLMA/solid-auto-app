@@ -423,7 +423,7 @@ export default function App() {
   </div>
 
   {/* Centre : bouton + */}
-  <div className="relative">
+  <div className="relative w-16 h-16">
     <button
       onClick={() => setShowReportForm(true)}
       className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-blue-600 hover:bg-blue-700
@@ -469,6 +469,7 @@ export default function App() {
     </span>
   </div>
 </div>
+
 
 
   {/* Bottom sheet : Report Form */}
