@@ -30,7 +30,6 @@ import Chat from "./Chat";
 import { useRef } from "react";
 import ProfileForm from "./ProfileForm";
 
-
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState(null);
@@ -381,46 +380,47 @@ export default function App() {
 }
 
   // Si pas d'utilisateur connecté, afficher Auth
-  if (!user) return <Auth />;
+  if (!user) return <Auth setUser={setUser} />;
 
   return (
     <div className="min-h-screen flex flex-col">
-<header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
-  <h1 className="text-xl font-bold">Bienvenue {user.username}</h1>
+      <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
+        <h1 className="text-xl font-bold">Bienvenue {user.name || user.username || user.email}</h1>
+          <button className="w-10 h-10 rounded-full ...">
+            {user.username ? user.username[0].toUpperCase() : "U"}
+          </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileMenu((prev) => !prev)}
+            className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg"
+          >
+            {user.username ? user.username[0].toUpperCase() : "U"}
+          </button>
 
-  <div className="relative">
-    <button
-      onClick={() => setShowProfileMenu((prev) => !prev)}
-      className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg"
-    >
-      {user.username ? user.username[0].toUpperCase() : "U"}
-    </button>
-
-    {showProfileMenu && (
-      <div className="absolute right-0 mt-2 w-48 bg-white text-black shadow-lg rounded-lg z-50">
-        <div className="px-4 py-2 border-b font-medium">
-          {user.username || "Utilisateur"}
+          {showProfileMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white text-black shadow-lg rounded-lg z-50">
+              <div className="px-4 py-2 border-b font-medium">
+                {user.username || "Utilisateur"}
+              </div>
+              <button
+                onClick={() => {
+                  setShowProfileForm(true);
+                  setShowProfileMenu(false); // ferme le menu quand on clique sur éditer
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-gray-100"
+              >
+                Éditer profil
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          )}
         </div>
-        <button
-          onClick={() => {
-            setShowProfileForm(true);
-            setShowProfileMenu(false); // ferme le menu quand on clique sur éditer
-          }}
-          className="w-full text-left px-4 py-2 hover:bg-gray-100"
-        >
-          Éditer profil
-        </button>
-        <button
-          onClick={handleLogout}
-          className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
-        >
-          Se déconnecter
-        </button>
-      </div>
-    )}
-  </div>
-</header>
-
+      </header>
 
 
   <main className="flex-1 relative bg-gray-100">
@@ -446,7 +446,11 @@ export default function App() {
 
 
   {showProfileForm && (
-  <ProfileForm user={user} onClose={() => setShowProfileForm(false)} />
+  <ProfileForm
+  user={user}
+  onClose={() => setShowProfileForm(false)}
+  onUpdate={(updatedUser) => setUser(updatedUser)}
+/>
 )}
 
 
