@@ -3,7 +3,6 @@ import './index.css';
 import Auth from "./Auth";
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
-// import Chat from "./Chat";
 import AlertsListener from "./AlertsListener";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -26,6 +25,9 @@ import useReportsListener from "./useReportsListener";
 import PayButton from "./PayButton";
 import { updateUserStatus } from "./userService";
 import { useNavigate } from "react-router-dom";
+import { FaGlobe, FaCommentDots, FaBook } from "react-icons/fa";
+import Chat from "./Chat";
+import { useRef } from "react";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -40,6 +42,8 @@ export default function App() {
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [page, setPage] = useState("map"); // valeur par défaut
   const userReports = useReportsListener(user);
+ const mapRef = useRef(null);
+
 
   // Auth
   useEffect(() => {
@@ -158,8 +162,6 @@ export default function App() {
   });
   return () => unsub();
 }, [user]);
-
-
 
   // Online / Offline
   useEffect(() => {
@@ -333,6 +335,45 @@ export default function App() {
     }
   };
 
+  function ChatButton({ activeReport, unreadMessages }) {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const handleClick = () => {
+    if (activeReport?.helperConfirmed) {
+      // Il y a une intervention en cours → ouvrir le chat
+      setIsChatOpen(true);
+    } else {
+      // Pas d'intervention → message informatif
+      toast.info("Vous n'avez aucune panne à signaler - souhaitez-vous signaler une panne ?");
+    }
+  };
+
+    return (
+    <>
+      <button
+        onClick={handleClick}
+        className="flex flex-col items-center relative"
+      >
+        <FaCommentDots size={24} />
+        <span className="text-xs mt-1">Chat</span>
+        {unreadMessages > 0 && activeReport?.helperConfirmed && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+            {unreadMessages}
+          </span>
+        )}
+      </button>
+
+      {/* Popup du chat */}
+      {isChatOpen && (
+        <Chat
+          reportId={activeReport.id}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
   // Si pas d'utilisateur connecté, afficher Auth
   if (!user) return <Auth />;
 
@@ -363,34 +404,50 @@ export default function App() {
       selectedAlert={selectedAlert}
       cancelReport={cancelReport}
       currentUserUid={user.uid}
+      ref={mapRef}
     />
   </div>
 
 {/* Menu flottant style Waze compact */}
-<div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-6 z-40 max-w-xs">
+<div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-2 flex items-center space-x-4 z-40 max-w-xs">
+
   {/* Badge pannes actives */}
   <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     ⚡ {reports.length}
   </span>
 
-  {/* Boutons principaux */}
-  <button onClick={() => navigateTo("map")} className="flex flex-col items-center">
-    🗺️
+  {/* Carte */}
+  <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center">
+    <FaGlobe size={24} />
     <span className="text-xs mt-1">Carte</span>
   </button>
 
-  <button onClick={() => navigateTo("chat")} className="flex flex-col items-center relative">
-    💬
+  {/* Chat */}
+  <button
+    onClick={() => {
+      if (activeReport?.helperConfirmed) {
+        navigateTo("chat");
+      } else {
+        toast.info("💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici.");
+      }
+    }}
+    className="flex flex-col items-center relative"
+  >
+    <FaCommentDots size={24} />
     <span className="text-xs mt-1">Chat</span>
-    {unreadMessages > 0 && (
+    {unreadMessages > 0 && activeReport?.helperConfirmed && (
       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
         {unreadMessages}
       </span>
     )}
   </button>
 
-  <button onClick={() => navigateTo("feed")} className="flex flex-col items-center">
-    📰
+  {/* Feed */}
+  <button
+    onClick={() => navigateTo("feed")}
+    className="flex flex-col items-center"
+  >
+    <FaBook size={24} />
     <span className="text-xs mt-1">Feed</span>
   </button>
 
@@ -398,7 +455,16 @@ export default function App() {
   <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     👥 {onlineUsers}
   </span>
+
+  {/* PayButton : visible uniquement si paiement requis */}
+  {activeReport?.helperConfirmed && activeReport.frais > 0 && (
+    <div className="flex flex-col items-center">
+      <PayButton report={activeReport} />
+    </div>
+  )}
+
 </div>
+
 
 {/* Bouton + SUR la carte */}
 <button
@@ -410,19 +476,6 @@ export default function App() {
 >
   +
 </button>
-
-
-
-  {/* Bouton + SUR la carte */}
-  <button
-    onClick={() => setShowReportForm(true)}
-    className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
-               rounded-full shadow-2xl flex items-center justify-center
-               text-white text-4xl font-bold border-4 border-white
-               transition-transform transform hover:scale-110 z-50"
-  >
-    +
-  </button>
 
   {/* Bottom sheet : Report Form */}
   {showReportForm && (
@@ -471,3 +524,4 @@ export default function App() {
     </div>
   );
 }
+

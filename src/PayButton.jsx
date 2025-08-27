@@ -24,14 +24,14 @@ export default function PayButton({ report }) {
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700"
+        className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-auto min-w-[140px] max-w-[200px]"
       >
         💳 Payer le dépannage
       </button>
 
       {showModal && (
         <ModalPortal onClose={() => setShowModal(false)}>
-          <h3>Paiement du dépannage</h3>
+          <h3 className="mb-4 text-lg font-bold">Paiement du dépannage</h3>
           <PayButtonInner report={report} onClose={() => setShowModal(false)} />
         </ModalPortal>
       )}
@@ -55,7 +55,7 @@ function PayButtonInner({ report }) {
   return (
     <button
       onClick={handleCheckout}
-      className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700"
+      className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 w-auto min-w-[140px] max-w-[200px]"
     >
       💳 Payer maintenant
     </button>
