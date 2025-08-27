@@ -146,7 +146,10 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
   };
 
   return (
-    <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
+
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-11/12">
+        <div style={{ padding: "10px", background: "#fff3cd", borderRadius: "8px" }}>
       <h4>📢 Mes alertes reçues</h4>
 
       <AcceptModal
@@ -205,6 +208,8 @@ export default function AlertsListener({ user, currentSolidaire, setSelectedAler
           ))}
         </ul>
       )}
+    </div>
+      </div>
     </div>
   );
 }
