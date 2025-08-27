@@ -411,7 +411,7 @@ export default function App() {
   </div>
 
 {/* Menu flottant style Instagram */}
-<div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 flex justify-around items-center z-50">
+<div className="fixed bottom-0 left-0 w-full bg-white shadow-t p-2 pb-20 flex justify-around items-center z-50">
   {/* Badge pannes actives */}
   <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
     ⚡ {reports.length}
@@ -455,18 +455,17 @@ export default function App() {
   </span>
 </div>
 
-
-
-{/* Bouton + SUR la carte */}
+{/* Bouton + SUR la carte, légèrement au-dessus du menu */}
 <button
   onClick={() => setShowReportForm(true)}
-  className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
+  className="fixed bottom-24 right-6 w-16 h-16 bg-blue-600 hover:bg-blue-700
              rounded-full shadow-2xl flex items-center justify-center
              text-white text-4xl font-bold border-4 border-white
              transition-transform transform hover:scale-110 z-50"
 >
   +
 </button>
+
 
   {/* Bottom sheet : Report Form */}
   {showReportForm && (
