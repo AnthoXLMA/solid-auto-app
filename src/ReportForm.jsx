@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
 
 export default function ReportForm({ userPosition, onNewReport, onClose }) {
@@ -23,30 +23,33 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
     setMessage("");
   };
 
-  // Swipe mobile
-  const onTouchStart = (e) => {
-    startX.current = e.touches[0].clientX;
-  };
+  // Navigation
+  const currentIndex = PANNE_TYPES.findIndex((p) => p.value === nature);
 
-  const onTouchEnd = (e) => {
-    const diff = e.changedTouches[0].clientX - startX.current;
-    if (diff > 30) slidePrev();
-    if (diff < -30) slideNext();
-  };
-
-  const slideNext = () => {
-    const index = PANNE_TYPES.findIndex((p) => p.value === nature);
-    const nextIndex = (index + 1) % PANNE_TYPES.length;
+  const slideNext = useCallback(() => {
+    const nextIndex = (currentIndex + 1) % PANNE_TYPES.length;
     setNature(PANNE_TYPES[nextIndex].value);
-  };
+  }, [currentIndex]);
 
-  const slidePrev = () => {
-    const index = PANNE_TYPES.findIndex((p) => p.value === nature);
-    const prevIndex = (index - 1 + PANNE_TYPES.length) % PANNE_TYPES.length;
+  const slidePrev = useCallback(() => {
+    const prevIndex = (currentIndex - 1 + PANNE_TYPES.length) % PANNE_TYPES.length;
     setNature(PANNE_TYPES[prevIndex].value);
-  };
+  }, [currentIndex]);
 
-  // Attacher les events via useEffect pour plus de contrôle
+  // Swipe mobile
+  const onTouchStart = useCallback((e) => {
+    startX.current = e.touches[0].clientX;
+  }, []);
+
+  const onTouchEnd = useCallback(
+    (e) => {
+      const diff = e.changedTouches[0].clientX - startX.current;
+      if (diff > 30) slidePrev();
+      if (diff < -30) slideNext();
+    },
+    [slideNext, slidePrev]
+  );
+
   useEffect(() => {
     const carousel = carouselRef.current;
     if (!carousel) return;
@@ -58,7 +61,7 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
       carousel.removeEventListener("touchstart", onTouchStart);
       carousel.removeEventListener("touchend", onTouchEnd);
     };
-  }, [nature]);
+  }, [onTouchStart, onTouchEnd]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-end bg-black/50 p-4">
@@ -67,22 +70,34 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
                    max-h-[90vh] animate-fade-in"
         style={{ marginBottom: "120px" }}
       >
-        <h3 className="text-center text-xl font-bold p-4 border-b">Signaler une panne</h3>
+        <h3 className="text-center text-xl font-bold p-4 border-b">
+          Signaler une panne
+        </h3>
 
         {/* Carousel swipe */}
-        <div ref={carouselRef} className="flex overflow-hidden p-4">
-          {PANNE_TYPES.map((p) => (
-            <div
-              key={p.value}
-              onClick={() => setNature(p.value)}
-              className={`flex-shrink-0 flex flex-col items-center justify-center w-40 h-40 p-4 m-2 rounded-lg border cursor-pointer transition-transform ${
-                nature === p.value ? "border-blue-600 bg-blue-50" : "border-gray-300 bg-white"
-              }`}
-            >
-              <div className="text-4xl mb-2">{p.icon}</div>
-              <div className="text-center font-medium">{p.label}</div>
-            </div>
-          ))}
+        <div className="overflow-hidden p-4">
+          <div
+            ref={carouselRef}
+            className="flex transition-transform duration-300"
+            style={{
+              transform: `translateX(-${currentIndex * 11}rem)`, // 11rem ≈ largeur carte (w-40 = 10rem) + margin
+            }}
+          >
+            {PANNE_TYPES.map((p) => (
+              <div
+                key={p.value}
+                onClick={() => setNature(p.value)}
+                className={`flex-shrink-0 flex flex-col items-center justify-center w-40 h-40 p-4 m-2 rounded-lg border cursor-pointer transition-colors ${
+                  nature === p.value
+                    ? "border-blue-600 bg-blue-50"
+                    : "border-gray-300 bg-white"
+                }`}
+              >
+                <div className="text-4xl mb-2">{p.icon}</div>
+                <div className="text-center font-medium">{p.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Contenu scrollable */}
