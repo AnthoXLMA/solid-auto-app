@@ -72,7 +72,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(doc(db, "solidaires", user.uid), { status: "aide en cours" });
-      setAcceptModal({ isOpen: true, alerte });
+
+      setAcceptModal({ isOpen: true, alerte }); // Ouvre modal pour confirmer frais
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
       console.error("Erreur acceptation :", err);
@@ -112,6 +113,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       if (!reportSnap.exists()) {
         await deleteDoc(doc(db, "alertes", alerte.id));
         removeAlertWithAnimation(alerte.id);
+        setAcceptModal({ isOpen: false, alerte: null });
         toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
         return;
       }
@@ -119,7 +121,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       const reportData = reportSnap.data();
       const reportOwnerUid = reportData.ownerUid;
 
-      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(reportRef, {
         status: "aide en cours",
         helperUid: user.uid,
@@ -131,7 +132,14 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       });
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
+      const escrowResult = await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
+      if (!escrowResult.success) {
+        toast.error("⚠️ Impossible de créer le paiement, réessayez plus tard.");
+        setAcceptModal({ isOpen: false, alerte: null });
+        return;
+      }
+
+      await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
 
       setAcceptModal({ isOpen: false, alerte: null });
@@ -148,6 +156,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     } catch (err) {
       console.error("Erreur pricing :", err);
       toast.error("❌ Erreur lors du calcul des frais.");
+      setAcceptModal({ isOpen: false, alerte: null });
     }
   };
 
