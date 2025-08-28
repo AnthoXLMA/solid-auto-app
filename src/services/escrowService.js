@@ -10,6 +10,14 @@ const escrows = {}; // En prod → stocker en DB
  */
 export const createEscrow = async (reportId, amount, setPaymentStatus) => {
   try {
+    if (amount <= 0) {
+      // Montant 0 → pas de Stripe, juste marquer comme séquestre créé
+      escrows[reportId] = { status: "created" };
+      setPaymentStatus("released"); // on considère déjà libéré
+      console.log("💰 Escrow 0 € créé pour report:", reportId);
+      return { success: true, status: "created" };
+    }
+
     setPaymentStatus("pending");
 
     const res = await fetch(`${API_URL}/create-payment`, {
@@ -46,6 +54,12 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
 
+    if (escrow.status === "created") {
+      setPaymentStatus("released");
+      console.log("💸 Paiement 0 € libéré pour report:", reportId);
+      return { success: true, status: "released" };
+    }
+
     const res = await fetch(`${API_URL}/release-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -77,6 +91,14 @@ export const refundEscrow = async (reportId, setPaymentStatus) => {
   try {
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
+
+    if (escrow.status === "created") {
+      // Montant 0 → pas de remboursement Stripe nécessaire
+      escrow.status = "refunded";
+      setPaymentStatus("refunded");
+      console.log("🔄 Paiement 0 € remboursé pour report:", reportId);
+      return { success: true, status: "refunded" };
+    }
 
     const res = await fetch(`${API_URL}/refund-payment`, {
       method: "POST",
