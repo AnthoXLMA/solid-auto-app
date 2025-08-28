@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
 
 export default function ReportForm({ userPosition, onNewReport, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
   const carouselRef = useRef(null);
+  const startX = useRef(0);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,18 +23,15 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
     setMessage("");
   };
 
-  // Gestion swipe
-  // const handleTouchStart = useRef(null);
-  const startX = useRef(0);
-
+  // Swipe mobile
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
   };
 
   const onTouchEnd = (e) => {
     const diff = e.changedTouches[0].clientX - startX.current;
-    if (diff > 50) slidePrev();
-    if (diff < -50) slideNext();
+    if (diff > 30) slidePrev();
+    if (diff < -30) slideNext();
   };
 
   const slideNext = () => {
@@ -48,6 +46,20 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
     setNature(PANNE_TYPES[prevIndex].value);
   };
 
+  // Attacher les events via useEffect pour plus de contrôle
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+
+    carousel.addEventListener("touchstart", onTouchStart, { passive: true });
+    carousel.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      carousel.removeEventListener("touchstart", onTouchStart);
+      carousel.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [nature]);
+
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-end bg-black/50 p-4">
       <div
@@ -58,12 +70,7 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
         <h3 className="text-center text-xl font-bold p-4 border-b">Signaler une panne</h3>
 
         {/* Carousel swipe */}
-        <div
-          ref={carouselRef}
-          className="flex overflow-hidden p-4"
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
+        <div ref={carouselRef} className="flex overflow-hidden p-4">
           {PANNE_TYPES.map((p) => (
             <div
               key={p.value}
