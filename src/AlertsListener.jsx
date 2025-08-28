@@ -25,7 +25,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
   const [paymentStatus, setPaymentStatus] = useState(null);
 
-  // 🔥 Marquer le solidaire en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "solidaires", user.uid);
@@ -33,7 +32,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
   }, [user]);
 
-  // 🔔 Écoute des alertes
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
@@ -42,11 +40,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-      const initialized = sorted.map(a => ({
-        ...a,
-        status: a.status || "en attente"
-      }));
-
+      const initialized = sorted.map(a => ({ ...a, status: a.status || "en attente" }));
       setAlerts(initialized);
 
       const newStatus = initialized.length > 0 ? "en attente de réponse" : "disponible";
@@ -107,7 +101,6 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
       const reportSnap = await getDoc(reportRef);
-
       if (!reportSnap.exists()) {
         await deleteDoc(doc(db, "alertes", alerte.id));
         removeAlertWithAnimation(alerte.id);
@@ -124,30 +117,23 @@ export default function AlertsListener({ user, setSelectedAlert }) {
         helperUid: user.uid,
         helperConfirmed: true,
         frais: fraisAnnules ? 0 : montant,
-        notificationForOwner: `🚨 Solidaire en route ! Montant : ${
-          fraisAnnules ? "0 €" : montant + " €"
-        }`,
+        notificationForOwner: `🚨 Solidaire en route ! Montant : ${fraisAnnules ? "0 €" : montant + " €"}`,
       });
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      const escrowResult = await createEscrow(
-        alerte.reportId,
-        fraisAnnules ? 0 : montant,
-        setPaymentStatus
-      );
-
+      const escrowResult = await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
       if (!escrowResult.success) {
         toast.error("⚠️ Impossible de créer le paiement, réessayez plus tard.");
-        setAcceptModal({ isOpen: false, alerte: null });
+        // Ne ferme pas AcceptModal pour permettre de réessayer
         return;
       }
 
-      // Suppression de l'alerte et ouverture du modal inProgress
-      await deleteDoc(doc(db, "alertes", alerte.id));
-      removeAlertWithAnimation(alerte.id);
-
+      // ✅ Tout est OK → fermer AcceptModal et ouvrir InProgressModal
       setAcceptModal({ isOpen: false, alerte: null });
       setInProgressModal({ isOpen: true, report: reportData });
+
+      await deleteDoc(doc(db, "alertes", alerte.id));
+      removeAlertWithAnimation(alerte.id);
 
       await addDoc(collection(db, "chats"), {
         reportId: alerte.reportId,
@@ -160,7 +146,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     } catch (err) {
       console.error("Erreur pricing :", err);
       toast.error("❌ Erreur lors du calcul des frais.");
-      setAcceptModal({ isOpen: false, alerte: null });
+      // Ne ferme pas la modal, le solidaire peut réessayer
     }
   };
 
@@ -171,83 +157,76 @@ export default function AlertsListener({ user, setSelectedAlert }) {
 
   const statusColor = (status) => {
     switch (status) {
-      case "accepté":
-        return "#d1e7dd";
-      case "refusé":
-        return "#f8d7da";
-      default:
-        return "#fff3cd";
+      case "accepté": return "#d1e7dd";
+      case "refusé": return "#f8d7da";
+      default: return "#fff3cd";
     }
   };
 
- return (
-  <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
-    <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
-      <h4 className="mb-4 font-semibold text-lg">📢 Mes alertes reçues</h4>
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+        <h4 className="mb-4 font-semibold text-lg">📢 Mes alertes reçues</h4>
 
-      <AcceptModal
-        isOpen={acceptModal.isOpen}
-        onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
-        alerte={acceptModal.alerte}
-        onConfirm={handleConfirmPricing}
-      />
+        <AcceptModal
+          isOpen={acceptModal.isOpen}
+          onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+          alerte={acceptModal.alerte}
+          onConfirm={handleConfirmPricing}
+        />
 
-      <InProgressModal
-        isOpen={inProgressModal.isOpen}
-        onClose={() => setInProgressModal({ isOpen: false, report: null })}
-        report={inProgressModal.report}
-        solidaire={user}
-        onComplete={handleReleasePayment}
-      />
+        <InProgressModal
+          isOpen={inProgressModal.isOpen}
+          onClose={() => setInProgressModal({ isOpen: false, report: null })}
+          report={inProgressModal.report}
+          solidaire={user}
+          onComplete={handleReleasePayment}
+        />
 
-      <HelpBanner
-        report={inProgressModal.report}
-        onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
-      />
+        <HelpBanner
+          report={inProgressModal.report}
+          onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
+        />
 
-      {alerts.length === 0 ? (
-        <p>Aucune alerte pour l’instant</p>
-      ) : (
-        <ul className="space-y-3">
-          {alerts.map((a) => (
-            <li
-              key={a.id}
-              className="p-3 rounded-lg shadow-sm"
-              style={{ backgroundColor: statusColor(a.status) }}
-            >
-              <h5 className="font-medium">
-                🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}
-              </h5>
-              <p>📍 À {a.distance || "?"} km de vous</p>
-              <div className="flex gap-2 mt-2">
-                <button
-                  className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                  onClick={() => setSelectedAlert(a)}
-                >
-                  📍 Voir sur la carte
-                </button>
-                <button
-                  className="px-2 py-1 rounded text-white"
-                  style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
-                  onClick={() => acceptAlert(a)}
-                  disabled={a.status === "accepté" || a.status === "refusé"}
-                >
-                  ✅ Accepter
-                </button>
-                <button
-                  className="px-2 py-1 rounded text-white"
-                  style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
-                  onClick={() => rejectAlert(a)}
-                  disabled={a.status === "accepté" || a.status === "refusé"}
-                >
-                  ❌ Refuser
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+        {alerts.length === 0 ? (
+          <p>Aucune alerte pour l’instant</p>
+        ) : (
+          <ul className="space-y-3">
+            {alerts.map((a) => (
+              <li key={a.id} className="p-3 rounded-lg shadow-sm" style={{ backgroundColor: statusColor(a.status) }}>
+                <h5 className="font-medium">
+                  🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}
+                </h5>
+                <p>📍 À {a.distance || "?"} km de vous</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                    onClick={() => setSelectedAlert(a)}
+                  >
+                    📍 Voir sur la carte
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
+                    onClick={() => acceptAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ✅ Accepter
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
+                    onClick={() => rejectAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ❌ Refuser
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 }
