@@ -1,11 +1,23 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
+import { ChevronLeft, ChevronRight } from "lucide-react"; // icônes flèches
 
 export default function ReportForm({ userPosition, onNewReport, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
   const carouselRef = useRef(null);
   const startX = useRef(0);
+  const [cardWidth, setCardWidth] = useState(0);
+
+  // Calcul largeur d’une carte (inclut margin)
+  useEffect(() => {
+    const firstCard = carouselRef.current?.querySelector(".carousel-card");
+    if (firstCard) {
+      const style = window.getComputedStyle(firstCard);
+      const marginRight = parseInt(style.marginRight, 10);
+      setCardWidth(firstCard.offsetWidth + marginRight);
+    }
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -74,30 +86,51 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
           Signaler une panne
         </h3>
 
-        {/* Carousel swipe */}
-        <div className="overflow-hidden p-4">
-          <div
-            ref={carouselRef}
-            className="flex transition-transform duration-300"
-            style={{
-              transform: `translateX(-${currentIndex * 11}rem)`, // 11rem ≈ largeur carte (w-40 = 10rem) + margin
-            }}
+        {/* Carousel avec flèches */}
+        <div className="relative p-4">
+          {/* Flèche gauche */}
+          <button
+            type="button"
+            onClick={slidePrev}
+            className="absolute left-0 top-1/2 -translate-y-1/2 bg-white shadow rounded-full p-2 hover:bg-gray-100"
           >
-            {PANNE_TYPES.map((p) => (
-              <div
-                key={p.value}
-                onClick={() => setNature(p.value)}
-                className={`flex-shrink-0 flex flex-col items-center justify-center w-40 h-40 p-4 m-2 rounded-lg border cursor-pointer transition-colors ${
-                  nature === p.value
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300 bg-white"
-                }`}
-              >
-                <div className="text-4xl mb-2">{p.icon}</div>
-                <div className="text-center font-medium">{p.label}</div>
-              </div>
-            ))}
+            <ChevronLeft size={20} />
+          </button>
+
+          {/* Container */}
+          <div className="overflow-hidden">
+            <div
+              ref={carouselRef}
+              className="flex transition-transform duration-300"
+              style={{
+                transform: `translateX(-${currentIndex * cardWidth}px)`,
+              }}
+            >
+              {PANNE_TYPES.map((p) => (
+                <div
+                  key={p.value}
+                  onClick={() => setNature(p.value)}
+                  className={`carousel-card flex-shrink-0 flex flex-col items-center justify-center w-40 h-40 p-4 mr-4 rounded-lg border cursor-pointer transition-colors ${
+                    nature === p.value
+                      ? "border-blue-600 bg-blue-50"
+                      : "border-gray-300 bg-white"
+                  }`}
+                >
+                  <div className="text-4xl mb-2">{p.icon}</div>
+                  <div className="text-center font-medium">{p.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Flèche droite */}
+          <button
+            type="button"
+            onClick={slideNext}
+            className="absolute right-0 top-1/2 -translate-y-1/2 bg-white shadow rounded-full p-2 hover:bg-gray-100"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
 
         {/* Contenu scrollable */}
