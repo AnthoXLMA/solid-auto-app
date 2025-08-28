@@ -29,7 +29,7 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
         onPaymentSuccess(null);
       } else if (result.paymentIntent.status === "requires_capture") {
         setStatus("✅ Paiement bloqué en séquestre !");
-        onPaymentSuccess("pending");
+        onPaymentSuccess("pending"); // paiement bloqué
       } else {
         setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
         onPaymentSuccess(null);
@@ -59,21 +59,27 @@ export default function PaymentBanner({ report, solidaire }) {
 
   // 1️⃣ Création de l'escrow
   const handleCreateEscrow = async () => {
-    const secret = await createEscrow(report.id, report.frais, setPaymentStatus);
-    if (secret) {
-      setClientSecret(secret);
+    const result = await createEscrow(report.id, report.frais, setPaymentStatus);
+    if (result.success && result.clientSecret) {
+      setClientSecret(result.clientSecret);
       setPaymentStatus("initiated"); // paiement initié, pas encore bloqué
     }
   };
 
   // 2️⃣ Libérer le paiement
   const handleReleaseEscrow = async () => {
-    await releaseEscrow(report.id, setPaymentStatus);
+    const result = await releaseEscrow(report.id, setPaymentStatus);
+    if (result.success) {
+      setPaymentStatus("released");
+    }
   };
 
   // 3️⃣ Rembourser le paiement
   const handleRefundEscrow = async () => {
-    await refundEscrow(report.id, setPaymentStatus);
+    const result = await refundEscrow(report.id, setPaymentStatus);
+    if (result.success) {
+      setPaymentStatus("refunded");
+    }
   };
 
   return (
@@ -94,21 +100,21 @@ export default function PaymentBanner({ report, solidaire }) {
       <p>🚗 {solidaire.name} est en route pour vous aider</p>
       <p>💰 Frais : {report.frais} €</p>
 
-      {/* 1️⃣ Bouton pour bloquer le paiement */}
+      {/* Bouton pour bloquer le paiement */}
       {paymentStatus === null && (
         <button onClick={handleCreateEscrow} style={{ marginTop: 10, padding: "6px 12px" }}>
           Bloquer le paiement (Escrow)
         </button>
       )}
 
-      {/* 2️⃣ Formulaire Stripe si paiement initié */}
+      {/* Formulaire Stripe si paiement initié */}
       {clientSecret && paymentStatus === "initiated" && (
         <Elements stripe={stripePromise}>
           <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} />
         </Elements>
       )}
 
-      {/* 3️⃣ Actions disponibles uniquement après paiement bloqué */}
+      {/* Actions disponibles uniquement après paiement bloqué */}
       {paymentStatus === "pending" && (
         <div style={{ marginTop: 10 }}>
           <p>✅ Paiement bloqué, le solidaire peut maintenant intervenir !</p>
@@ -119,7 +125,7 @@ export default function PaymentBanner({ report, solidaire }) {
         </div>
       )}
 
-      {/* 4️⃣ États finaux */}
+      {/* États finaux */}
       {paymentStatus === "released" && <p>✅ Paiement libéré au solidaire !</p>}
       {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé.</p>}
     </div>

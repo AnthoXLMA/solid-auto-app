@@ -1,5 +1,4 @@
 // src/services/escrowService.js
-
 const API_URL = "http://localhost:4242";
 
 // Stock temporaire des escrows (en mémoire)
@@ -10,15 +9,15 @@ const escrows = {}; // En prod → stocker en DB
  */
 export const createEscrow = async (reportId, amount, setPaymentStatus) => {
   try {
+    if (!setPaymentStatus) setPaymentStatus = () => {};
+
     if (amount <= 0) {
-      // Montant 0 → pas de Stripe, on considère déjà libéré
       escrows[reportId] = { status: "released" };
       setPaymentStatus("released");
       console.log("💰 Escrow 0 € créé pour report:", reportId);
       return { success: true, status: "released" };
     }
 
-    // On ne met pas pending ici, juste "initiated" pour afficher Stripe
     setPaymentStatus("initiated");
 
     const res = await fetch(`${API_URL}/create-payment`, {
@@ -30,7 +29,7 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
     if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
 
     const data = await res.json();
-    if (!data.clientSecret) throw new Error("Erreur lors de la création du paiement");
+    if (!data.clientSecret || !data.paymentIntentId) throw new Error("Erreur création PaymentIntent");
 
     escrows[reportId] = {
       clientSecret: data.clientSecret,
@@ -38,7 +37,7 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
       status: "initiated",
     };
 
-    console.log("✅ Escrow créé pour report:", reportId);
+    console.log("✅ Escrow créé pour report:", reportId, data);
     return { success: true, clientSecret: data.clientSecret, status: "initiated" };
   } catch (err) {
     console.error("❌ createEscrow:", err.message);
@@ -47,18 +46,18 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
   }
 };
 
-
 /**
  * 2️⃣ Libérer le paiement (capturer le séquestre)
  */
 export const releaseEscrow = async (reportId, setPaymentStatus) => {
   try {
+    if (!setPaymentStatus) setPaymentStatus = () => {};
+
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
 
-    if (escrow.status === "created") {
-      setPaymentStatus("released");
-      console.log("💸 Paiement 0 € libéré pour report:", reportId);
+    if (escrow.status === "released") {
+      console.log("💸 Paiement déjà libéré pour report:", reportId);
       return { success: true, status: "released" };
     }
 
@@ -71,6 +70,8 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
     if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
 
     const data = await res.json();
+    console.log("Response release-payment:", data);
+
     if (data.success) {
       escrow.status = "released";
       setPaymentStatus("released");
@@ -91,14 +92,13 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
  */
 export const refundEscrow = async (reportId, setPaymentStatus) => {
   try {
+    if (!setPaymentStatus) setPaymentStatus = () => {};
+
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
 
-    if (escrow.status === "created") {
-      // Montant 0 → pas de remboursement Stripe nécessaire
-      escrow.status = "refunded";
-      setPaymentStatus("refunded");
-      console.log("🔄 Paiement 0 € remboursé pour report:", reportId);
+    if (escrow.status === "refunded") {
+      console.log("🔄 Paiement déjà remboursé pour report:", reportId);
       return { success: true, status: "refunded" };
     }
 
@@ -111,6 +111,8 @@ export const refundEscrow = async (reportId, setPaymentStatus) => {
     if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
 
     const data = await res.json();
+    console.log("Response refund-payment:", data);
+
     if (data.success) {
       escrow.status = "refunded";
       setPaymentStatus("refunded");
