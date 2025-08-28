@@ -51,7 +51,10 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
  */
 export const releaseEscrow = async (reportId, setPaymentStatus) => {
   try {
-    if (!setPaymentStatus) setPaymentStatus = () => {};
+    // si pas de fonction passée → noop
+    if (typeof setPaymentStatus !== "function") {
+      setPaymentStatus = () => {};
+    }
 
     const escrow = escrows[reportId];
     if (!escrow) throw new Error("Escrow introuvable");
@@ -74,7 +77,11 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
 
     if (data.success) {
       escrow.status = "released";
-      setPaymentStatus("released");
+
+      if (typeof setPaymentStatus === "function") {
+        setPaymentStatus("released");
+      }
+
       console.log("💸 Paiement libéré pour report:", reportId);
       return { success: true, status: "released" };
     } else {
@@ -82,7 +89,11 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
     }
   } catch (err) {
     console.error("❌ releaseEscrow:", err.message);
-    setPaymentStatus("error");
+
+    if (typeof setPaymentStatus === "function") {
+      setPaymentStatus("error");
+    }
+
     return { success: false, error: err.message };
   }
 };
