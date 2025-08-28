@@ -14,10 +14,8 @@ if (!process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY) {
   console.error("❌ Clé publique Stripe manquante dans .env !");
 }
 
-/**
- * Formulaire Stripe pour confirmer le paiement
- */
-function StripeCheckout({ clientSecret, setPaymentStatus }) {
+// Formulaire Stripe pour confirmer le paiement
+function StripeCheckout({ clientSecret, onPaymentSuccess }) {
   const stripe = useStripe();
   const elements = useElements();
   const [status, setStatus] = useState("");
@@ -27,22 +25,19 @@ function StripeCheckout({ clientSecret, setPaymentStatus }) {
 
     try {
       const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-        },
+        payment_method: { card: elements.getElement(CardElement) },
       });
 
       if (result.error) {
         setStatus("Erreur : " + result.error.message);
-        setPaymentStatus(null);
+        onPaymentSuccess(null);
       } else if (result.paymentIntent.status === "requires_capture") {
-        // 💡 Le paiement est autorisé mais en attente de capture (escrow)
         setStatus("✅ Paiement bloqué en séquestre !");
-        setPaymentStatus("pending");
+        onPaymentSuccess("pending");
       }
     } catch (err) {
       setStatus("Erreur : " + err.message);
-      setPaymentStatus(null);
+      onPaymentSuccess(null);
     }
   };
 
@@ -58,16 +53,28 @@ function StripeCheckout({ clientSecret, setPaymentStatus }) {
 }
 
 export default function PaymentBanner({ report, solidaire }) {
-  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null); // null | pending | released | refunded
   const [clientSecret, setClientSecret] = useState(null);
 
   if (!report || !solidaire) return null;
 
+  // 1️⃣ Création de l'escrow
   const handleCreateEscrow = async () => {
     const secret = await createEscrow(report.id, report.frais, setPaymentStatus);
     if (secret) {
       setClientSecret(secret);
+      setPaymentStatus("initiated"); // paiement initié, pas encore bloqué
     }
+  };
+
+  // 2️⃣ Libérer paiement
+  const handleReleaseEscrow = async () => {
+    await releaseEscrow(report.id, setPaymentStatus);
+  };
+
+  // 3️⃣ Rembourser paiement
+  const handleRefundEscrow = async () => {
+    await refundEscrow(report.id, setPaymentStatus);
   };
 
   return (
@@ -88,46 +95,40 @@ export default function PaymentBanner({ report, solidaire }) {
       <p>🚗 {solidaire.name} est en route pour vous aider</p>
       <p>💰 Frais : {report.frais} €</p>
 
-      {/* 1️⃣ Création de l'escrow */}
+      {/* Bouton bloquer le paiement (Escrow) */}
       {paymentStatus === null && (
-        <button
-          onClick={handleCreateEscrow}
-          style={{ marginTop: 10, padding: "6px 12px" }}
-        >
+        <button onClick={handleCreateEscrow} style={{ marginTop: 10, padding: "6px 12px" }}>
           Bloquer le paiement (Escrow)
         </button>
       )}
 
-      {/* 2️⃣ Paiement avec Stripe (si escrow créé) */}
-      {clientSecret && paymentStatus === "pending" && (
+      {/* Formulaire Stripe si paiement initié */}
+      {clientSecret && paymentStatus === "initiated" && (
         <Elements stripe={stripePromise}>
           <StripeCheckout
             clientSecret={clientSecret}
-            setPaymentStatus={setPaymentStatus}
+            onPaymentSuccess={setPaymentStatus}
           />
         </Elements>
       )}
 
-      {/* 3️⃣ États */}
-      {paymentStatus === "released" && <p>✅ Paiement libéré au solidaire !</p>}
-      {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé.</p>}
-
-      {/* 4️⃣ Actions de test (dev only) */}
+      {/* Actions disponibles uniquement après paiement bloqué */}
       {paymentStatus === "pending" && (
         <div style={{ marginTop: 10 }}>
-          <button
-            onClick={() => releaseEscrow(report.id, setPaymentStatus)}
-            style={{ marginRight: 10 }}
-          >
+          <p>✅ Paiement bloqué, le solidaire peut maintenant intervenir !</p>
+          {/* Boutons de test pour dev */}
+          <button onClick={handleReleaseEscrow} style={{ marginRight: 10 }}>
             Simuler intervention terminée
           </button>
-          <button
-            onClick={() => refundEscrow(report.id, setPaymentStatus)}
-          >
+          <button onClick={handleRefundEscrow}>
             Simuler annulation
           </button>
         </div>
       )}
+
+      {/* États finaux */}
+      {paymentStatus === "released" && <p>✅ Paiement libéré au solidaire !</p>}
+      {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé.</p>}
     </div>
   );
 }
