@@ -1,9 +1,15 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fs from "fs";
+import path from "path";
 import admin from "firebase-admin";
 import { createPaymentIntent, capturePaymentIntent, refundPaymentIntent } from "./stripeService.js";
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+
+// 🔑 Charger la clé Firebase
+const serviceAccount = JSON.parse(
+  fs.readFileSync(path.resolve("./backend/serviceAccountKey.json"), "utf-8")
+);
 
 // 🔑 Initialiser Firebase Admin
 if (!admin.apps.length) {
@@ -29,9 +35,7 @@ app.post("/create-payment", async (req, res) => {
   const { reportId, amount } = req.body;
   try {
     console.log(`➡️ Création PaymentIntent pour report ${reportId}, montant: ${amount}`);
-
     const paymentIntent = await createPaymentIntent(amount);
-    console.log("✅ PaymentIntent créé :", paymentIntent.id, "statut:", paymentIntent.status);
 
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "created",
@@ -56,9 +60,7 @@ app.post("/release-payment", async (req, res) => {
   const { reportId, paymentIntentId } = req.body;
   try {
     console.log(`➡️ Capture PaymentIntent ${paymentIntentId}`);
-
     const paymentIntent = await capturePaymentIntent(paymentIntentId);
-    console.log("✅ Paiement capturé :", paymentIntent.id, "statut:", paymentIntent.status);
 
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "released",
@@ -80,7 +82,6 @@ app.post("/refund-payment", async (req, res) => {
   try {
     console.log(`➡️ Refund PaymentIntent ${paymentIntentId}`);
     const refund = await refundPaymentIntent(paymentIntentId);
-    console.log("✅ Paiement remboursé :", refund.id);
 
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "refunded",
