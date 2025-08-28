@@ -13,14 +13,11 @@ export default function InProgressModal({
 }) {
   const [loading, setLoading] = useState(false);
 
-  // Reset loading si le modal se ferme ou change de report/solidaire
   useEffect(() => {
     if (!isOpen) setLoading(false);
   }, [isOpen, report, solidaire]);
 
-  // Ne rien afficher si modal fermé ou props manquantes
   if (!isOpen || !report || !solidaire) return null;
-
 
   const handleComplete = async () => {
     try {
@@ -35,8 +32,10 @@ export default function InProgressModal({
       setLoading(true);
       setPaymentStatus?.("releasing");
 
-      const result = await releaseEscrow(report.paymentIntentId, setPaymentStatus);
+      // Utilisation sécurisée : passe paymentIntentId si dispo, sinon reportId
+      const idToRelease = report.paymentIntentId || report.id;
 
+      const result = await releaseEscrow(idToRelease, setPaymentStatus);
 
       if (result.success) {
         toast.success("💸 Paiement libéré !");

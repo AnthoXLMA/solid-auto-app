@@ -23,7 +23,7 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
   };
 
   // Gestion swipe
-  const handleTouchStart = useRef(null);
+  // const handleTouchStart = useRef(null);
   const startX = useRef(0);
 
   const onTouchStart = (e) => {

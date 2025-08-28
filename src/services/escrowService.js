@@ -49,20 +49,37 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
 /**
  * 2️⃣ Libérer le paiement (capturer le séquestre)
  */
-export const releaseEscrow = async (reportId, setPaymentStatus) => {
+/**
+ * 2️⃣ Libérer le paiement (capturer le séquestre)
+ * Supporte reportId ou paymentIntentId
+ */
+export const releaseEscrow = async (reportOrPaymentIntentId, setPaymentStatus) => {
   try {
-    // si pas de fonction passée → noop
-    if (typeof setPaymentStatus !== "function") {
-      setPaymentStatus = () => {};
-    }
+    if (typeof setPaymentStatus !== "function") setPaymentStatus = () => {};
 
-    const escrow = escrows[reportId];
-    if (!escrow) throw new Error("Escrow introuvable");
+    let escrow;
+    let reportId;
+
+    if (reportOrPaymentIntentId.startsWith("pi_")) {
+      // PaymentIntentId fourni
+      const found = Object.entries(escrows).find(
+        ([_, e]) => e.paymentIntentId === reportOrPaymentIntentId
+      );
+      if (!found) throw new Error("Escrow introuvable pour ce PaymentIntentId");
+      [reportId, escrow] = found;
+    } else {
+      // reportId fourni
+      reportId = reportOrPaymentIntentId;
+      escrow = escrows[reportId];
+      if (!escrow) throw new Error("Escrow introuvable pour ce reportId");
+    }
 
     if (escrow.status === "released") {
       console.log("💸 Paiement déjà libéré pour report:", reportId);
       return { success: true, status: "released" };
     }
+
+    setPaymentStatus("releasing");
 
     const res = await fetch(`${API_URL}/release-payment`, {
       method: "POST",
@@ -73,15 +90,10 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
     if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
 
     const data = await res.json();
-    console.log("Response release-payment:", data);
 
     if (data.success) {
       escrow.status = "released";
-
-      if (typeof setPaymentStatus === "function") {
-        setPaymentStatus("released");
-      }
-
+      setPaymentStatus("released");
       console.log("💸 Paiement libéré pour report:", reportId);
       return { success: true, status: "released" };
     } else {
@@ -89,24 +101,35 @@ export const releaseEscrow = async (reportId, setPaymentStatus) => {
     }
   } catch (err) {
     console.error("❌ releaseEscrow:", err.message);
-
-    if (typeof setPaymentStatus === "function") {
-      setPaymentStatus("error");
-    }
-
+    setPaymentStatus("error");
     return { success: false, error: err.message };
   }
 };
 
+
 /**
  * 3️⃣ Rembourser (si annulé)
+ * Supporte reportId ou paymentIntentId
  */
-export const refundEscrow = async (reportId, setPaymentStatus) => {
+export const refundEscrow = async (reportOrPaymentIntentId, setPaymentStatus) => {
   try {
-    if (!setPaymentStatus) setPaymentStatus = () => {};
+    if (typeof setPaymentStatus !== "function") setPaymentStatus = () => {};
 
-    const escrow = escrows[reportId];
-    if (!escrow) throw new Error("Escrow introuvable");
+    // Identifier l'escrow
+    let escrow;
+    let reportId;
+
+    if (reportOrPaymentIntentId.startsWith("pi_")) {
+      escrow = Object.entries(escrows).find(
+        ([_, e]) => e.paymentIntentId === reportOrPaymentIntentId
+      );
+      if (!escrow) throw new Error("Escrow introuvable pour ce PaymentIntentId");
+      [reportId, escrow] = escrow;
+    } else {
+      reportId = reportOrPaymentIntentId;
+      escrow = escrows[reportId];
+      if (!escrow) throw new Error("Escrow introuvable pour ce reportId");
+    }
 
     if (escrow.status === "refunded") {
       console.log("🔄 Paiement déjà remboursé pour report:", reportId);
@@ -138,3 +161,4 @@ export const refundEscrow = async (reportId, setPaymentStatus) => {
     return { success: false, error: err.message };
   }
 };
+

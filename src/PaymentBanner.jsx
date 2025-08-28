@@ -10,134 +10,157 @@ if (!process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY) {
   console.error("❌ Clé publique Stripe manquante dans .env !");
 }
 
-// Formulaire Stripe pour confirmer le paiement
+// --- StripeCheckout Component ---
 function StripeCheckout({ clientSecret, onPaymentSuccess }) {
   const stripe = useStripe();
   const elements = useElements();
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handlePay = async () => {
     if (!stripe || !elements) return;
-
+    setLoading(true);
     try {
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: { card: elements.getElement(CardElement) },
       });
 
       if (result.error) {
-        setStatus("Erreur : " + result.error.message);
+        setStatus(`❌ ${result.error.message}`);
         onPaymentSuccess(null);
       } else {
-        // 🔹 Nouveau : afficher le PaymentIntent complet pour debug
         console.log("PaymentIntent reçu :", result.paymentIntent);
-        console.log("Status PaymentIntent :", result.paymentIntent.status);
 
         if (result.paymentIntent.status === "requires_capture") {
           setStatus("✅ Paiement bloqué en séquestre !");
-          onPaymentSuccess("pending"); // paiement bloqué
+          onPaymentSuccess("pending");
         } else if (result.paymentIntent.status === "succeeded") {
           setStatus("✅ Paiement capturé immédiatement !");
-          onPaymentSuccess("released"); // paiement déjà libéré
+          onPaymentSuccess("released");
         } else {
           setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
           onPaymentSuccess(null);
         }
       }
     } catch (err) {
-      setStatus("Erreur : " + err.message);
+      setStatus("❌ Erreur : " + err.message);
       onPaymentSuccess(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ marginTop: 10 }}>
-      <CardElement />
-      <button onClick={handlePay} disabled={!stripe} style={{ marginTop: 10 }}>
-        Confirmer le paiement
+    <div className="space-y-4 mt-4">
+      <div className="p-3 border rounded-lg bg-white">
+        <CardElement />
+      </div>
+      <button
+        onClick={handlePay}
+        disabled={!stripe || loading}
+        className={`w-full py-2 rounded-lg text-white font-semibold transition ${
+          loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+        }`}
+      >
+        {loading ? "⏳ Confirmer..." : "Confirmer le paiement"}
       </button>
-      <p>{status}</p>
+      {status && (
+        <div
+          className={`mt-2 p-2 rounded text-sm ${
+            status.includes("❌")
+              ? "bg-red-50 text-red-600 border border-red-200"
+              : "bg-green-50 text-green-600 border border-green-200"
+          }`}
+        >
+          {status}
+        </div>
+      )}
     </div>
   );
 }
 
-
+// --- PaymentBanner Component ---
 export default function PaymentBanner({ report, solidaire }) {
-  const [paymentStatus, setPaymentStatus] = useState(null); // null | initiated | pending | released | refunded
+  const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
   if (!report || !solidaire) return null;
 
-  // 1️⃣ Création de l'escrow
   const handleCreateEscrow = async () => {
     const result = await createEscrow(report.id, report.frais, setPaymentStatus);
     if (result.success && result.clientSecret) {
       setClientSecret(result.clientSecret);
-      setPaymentStatus("initiated"); // paiement initié, pas encore bloqué
+      setPaymentStatus("initiated");
     }
   };
 
-  // 2️⃣ Libérer le paiement
   const handleReleaseEscrow = async () => {
     const result = await releaseEscrow(report.id, setPaymentStatus);
-    if (result.success) {
-      setPaymentStatus("released");
-    }
+    if (result.success) setPaymentStatus("released");
   };
 
-  // 3️⃣ Rembourser le paiement
   const handleRefundEscrow = async () => {
     const result = await refundEscrow(report.id, setPaymentStatus);
-    if (result.success) {
-      setPaymentStatus("refunded");
-    }
+    if (result.success) setPaymentStatus("refunded");
   };
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 10,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "#e6f7ff",
-        border: "1px solid #91d5ff",
-        padding: "10px 20px",
-        borderRadius: "12px",
-        zIndex: 1000,
-        textAlign: "center",
-      }}
+    <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
+  <h2 className="text-center text-lg font-semibold mb-2">
+    🚗 {solidaire.name} est en route !
+  </h2>
+  <p className="text-center text-gray-700 mb-4">
+    💰 Frais : <span className="font-bold">{report.frais} €</span>
+  </p>
+
+  {paymentStatus === null && (
+    <button
+      onClick={handleCreateEscrow}
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
     >
-      <p>🚗 {solidaire.name} est en route pour vous aider</p>
-      <p>💰 Frais : {report.frais} €</p>
+      Bloquer le paiement (Escrow)
+    </button>
+  )}
 
-      {/* Bouton pour bloquer le paiement */}
-      {paymentStatus === null && (
-        <button onClick={handleCreateEscrow} style={{ marginTop: 10, padding: "6px 12px" }}>
-          Bloquer le paiement (Escrow)
+  {clientSecret && paymentStatus === "initiated" && (
+    <Elements stripe={stripePromise}>
+      <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} />
+    </Elements>
+  )}
+
+  {paymentStatus === "pending" && (
+    <div className="space-y-2 text-center mt-4">
+      <div className="bg-green-50 border border-green-200 text-green-600 p-2 rounded text-sm">
+        ✅ Paiement bloqué, le solidaire peut intervenir !
+      </div>
+      <div className="flex gap-2 justify-center mt-2">
+        <button
+          onClick={handleReleaseEscrow}
+          className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
+        >
+          Terminer intervention
         </button>
-      )}
-
-      {/* Formulaire Stripe si paiement initié */}
-      {clientSecret && paymentStatus === "initiated" && (
-        <Elements stripe={stripePromise}>
-          <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} />
-        </Elements>
-      )}
-
-      {/* Actions disponibles uniquement après paiement bloqué */}
-      {paymentStatus === "pending" && (
-        <div style={{ marginTop: 10 }}>
-          <p>✅ Paiement bloqué, le solidaire peut maintenant intervenir !</p>
-          <button onClick={handleReleaseEscrow} style={{ marginRight: 10 }}>
-            Simuler intervention terminée
-          </button>
-          <button onClick={handleRefundEscrow}>Simuler annulation</button>
-        </div>
-      )}
-
-      {/* États finaux */}
-      {paymentStatus === "released" && <p>✅ Paiement libéré au solidaire !</p>}
-      {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé.</p>}
+        <button
+          onClick={handleRefundEscrow}
+          className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
-  );
+  )}
+
+  {paymentStatus === "released" && (
+    <div className="bg-green-50 border border-green-200 text-green-600 p-2 rounded text-center mt-4">
+      ✅ Paiement libéré au solidaire !
+    </div>
+  )}
+
+  {paymentStatus === "refunded" && (
+    <div className="bg-red-50 border border-red-200 text-red-600 p-2 rounded text-center mt-4">
+      ⚠️ Paiement remboursé.
+    </div>
+  )}
+</div>
+);
 }
