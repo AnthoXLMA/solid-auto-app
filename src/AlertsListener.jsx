@@ -25,6 +25,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
   const [paymentStatus, setPaymentStatus] = useState(null);
 
+  // Marque le solidaire en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "solidaires", user.uid);
@@ -32,6 +33,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
   }, [user]);
 
+  // Écoute des alertes
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
@@ -95,6 +97,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
+  // Solidaire valide les frais
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     if (!alerte?.reportId) return;
 
@@ -110,10 +113,8 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       }
 
       const reportData = reportSnap.data();
-      const reportOwnerUid = reportData.ownerUid;
-
       await updateDoc(reportRef, {
-        status: "aide en cours",
+        status: "attente séquestre",
         helperUid: user.uid,
         helperConfirmed: true,
         frais: fraisAnnules ? 0 : montant,
@@ -121,34 +122,30 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       });
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      const escrowResult = await createEscrow(alerte.reportId, fraisAnnules ? 0 : montant, setPaymentStatus);
-      if (!escrowResult.success) {
-        toast.error("⚠️ Impossible de créer le paiement, réessayez plus tard.");
-        // Ne ferme pas AcceptModal pour permettre de réessayer
-        return;
-      }
-
-      // ✅ Tout est OK → fermer AcceptModal et ouvrir InProgressModal
-      setAcceptModal({ isOpen: false, alerte: null });
-      setInProgressModal({ isOpen: true, report: reportData });
-
-      await deleteDoc(doc(db, "alertes", alerte.id));
-      removeAlertWithAnimation(alerte.id);
-
-      await addDoc(collection(db, "chats"), {
-        reportId: alerte.reportId,
-        participants: [user.uid, reportOwnerUid],
-        messages: [],
-        createdAt: new Date(),
-      });
-
-      toast.success("✅ Vous avez accepté d’aider !");
+      toast.info("Le sinistré doit maintenant séquestrer le montant.");
+      // On laisse AcceptModal ouverte jusqu'à séquestre
     } catch (err) {
-      console.error("Erreur pricing :", err);
-      toast.error("❌ Erreur lors du calcul des frais.");
-      // Ne ferme pas la modal, le solidaire peut réessayer
+      console.error("Erreur confirmation frais :", err);
+      toast.error("❌ Erreur lors de la validation des frais.");
     }
   };
+
+  // Écoute les rapports pour séquestre
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach((docSnap) => {
+        const report = { id: docSnap.id, ...docSnap.data() };
+        if (report.status === "séquestre créé") {
+          setAcceptModal({ isOpen: false, alerte: null }); // ferme AcceptModal
+          setInProgressModal({ isOpen: true, report }); // ouvre InProgressModal
+          toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
+        }
+      });
+    });
+    return () => unsub();
+  }, [user]);
 
   const handleReleasePayment = async (reportId) => {
     await releaseEscrow(reportId, setPaymentStatus);
