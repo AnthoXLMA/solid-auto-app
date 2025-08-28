@@ -25,7 +25,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
   const [paymentStatus, setPaymentStatus] = useState(null);
 
-  // Marque le solidaire en ligne
+  // 🔥 Marquer le solidaire en ligne
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, "solidaires", user.uid);
@@ -33,7 +33,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
   }, [user]);
 
-  // Écoute des alertes
+  // 🔔 Écoute des alertes
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
@@ -113,6 +113,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       }
 
       const reportData = reportSnap.data();
+
       await updateDoc(reportRef, {
         status: "attente séquestre",
         helperUid: user.uid,
@@ -123,29 +124,38 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
       toast.info("Le sinistré doit maintenant séquestrer le montant.");
-      // On laisse AcceptModal ouverte jusqu'à séquestre
+      // AcceptModal reste ouverte jusqu'au séquestre
     } catch (err) {
       console.error("Erreur confirmation frais :", err);
       toast.error("❌ Erreur lors de la validation des frais.");
     }
   };
 
-  // Écoute les rapports pour séquestre
+  // 🔔 Écoute les reports pour séquestre et ouverture InProgressModal
   useEffect(() => {
     if (!user) return;
+
     const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       snapshot.docs.forEach((docSnap) => {
         const report = { id: docSnap.id, ...docSnap.data() };
-        if (report.status === "séquestre créé") {
+
+        // Montant séquestré
+        if (report.escrowStatus === "created" && !inProgressModal.isOpen) {
           setAcceptModal({ isOpen: false, alerte: null }); // ferme AcceptModal
           setInProgressModal({ isOpen: true, report }); // ouvre InProgressModal
           toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
         }
+
+        // Alerte rejetée ou autre statut
+        if (report.status === "aide refusée") {
+          if (report.alertId) removeAlertWithAnimation(report.alertId);
+        }
       });
     });
+
     return () => unsub();
-  }, [user]);
+  }, [user, inProgressModal.isOpen]);
 
   const handleReleasePayment = async (reportId) => {
     await releaseEscrow(reportId, setPaymentStatus);
