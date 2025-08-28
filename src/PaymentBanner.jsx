@@ -27,12 +27,21 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
       if (result.error) {
         setStatus("Erreur : " + result.error.message);
         onPaymentSuccess(null);
-      } else if (result.paymentIntent.status === "requires_capture") {
-        setStatus("✅ Paiement bloqué en séquestre !");
-        onPaymentSuccess("pending"); // paiement bloqué
       } else {
-        setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
-        onPaymentSuccess(null);
+        // 🔹 Nouveau : afficher le PaymentIntent complet pour debug
+        console.log("PaymentIntent reçu :", result.paymentIntent);
+        console.log("Status PaymentIntent :", result.paymentIntent.status);
+
+        if (result.paymentIntent.status === "requires_capture") {
+          setStatus("✅ Paiement bloqué en séquestre !");
+          onPaymentSuccess("pending"); // paiement bloqué
+        } else if (result.paymentIntent.status === "succeeded") {
+          setStatus("✅ Paiement capturé immédiatement !");
+          onPaymentSuccess("released"); // paiement déjà libéré
+        } else {
+          setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
+          onPaymentSuccess(null);
+        }
       }
     } catch (err) {
       setStatus("Erreur : " + err.message);
@@ -50,6 +59,7 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
     </div>
   );
 }
+
 
 export default function PaymentBanner({ report, solidaire }) {
   const [paymentStatus, setPaymentStatus] = useState(null); // null | initiated | pending | released | refunded

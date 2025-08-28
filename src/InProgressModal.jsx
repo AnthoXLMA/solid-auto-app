@@ -21,6 +21,7 @@ export default function InProgressModal({
   // Ne rien afficher si modal fermé ou props manquantes
   if (!isOpen || !report || !solidaire) return null;
 
+
   const handleComplete = async () => {
     try {
       // Cas où le montant est 0 € → pas de paiement à libérer
@@ -34,7 +35,8 @@ export default function InProgressModal({
       setLoading(true);
       setPaymentStatus?.("releasing");
 
-      const result = await releaseEscrow(report.id, setPaymentStatus);
+      const result = await releaseEscrow(report.paymentIntentId, setPaymentStatus);
+
 
       if (result.success) {
         toast.success("💸 Paiement libéré !");
