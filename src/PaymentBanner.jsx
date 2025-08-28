@@ -1,9 +1,5 @@
 import React, { useState } from "react";
-import {
-  createEscrow,
-  releaseEscrow,
-  refundEscrow
-} from "./services/escrowService";
+import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowService";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
@@ -34,6 +30,9 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
       } else if (result.paymentIntent.status === "requires_capture") {
         setStatus("✅ Paiement bloqué en séquestre !");
         onPaymentSuccess("pending");
+      } else {
+        setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
+        onPaymentSuccess(null);
       }
     } catch (err) {
       setStatus("Erreur : " + err.message);
@@ -53,7 +52,7 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
 }
 
 export default function PaymentBanner({ report, solidaire }) {
-  const [paymentStatus, setPaymentStatus] = useState(null); // null | pending | released | refunded
+  const [paymentStatus, setPaymentStatus] = useState(null); // null | initiated | pending | released | refunded
   const [clientSecret, setClientSecret] = useState(null);
 
   if (!report || !solidaire) return null;
@@ -67,12 +66,12 @@ export default function PaymentBanner({ report, solidaire }) {
     }
   };
 
-  // 2️⃣ Libérer paiement
+  // 2️⃣ Libérer le paiement
   const handleReleaseEscrow = async () => {
     await releaseEscrow(report.id, setPaymentStatus);
   };
 
-  // 3️⃣ Rembourser paiement
+  // 3️⃣ Rembourser le paiement
   const handleRefundEscrow = async () => {
     await refundEscrow(report.id, setPaymentStatus);
   };
@@ -95,38 +94,32 @@ export default function PaymentBanner({ report, solidaire }) {
       <p>🚗 {solidaire.name} est en route pour vous aider</p>
       <p>💰 Frais : {report.frais} €</p>
 
-      {/* Bouton bloquer le paiement (Escrow) */}
+      {/* 1️⃣ Bouton pour bloquer le paiement */}
       {paymentStatus === null && (
         <button onClick={handleCreateEscrow} style={{ marginTop: 10, padding: "6px 12px" }}>
           Bloquer le paiement (Escrow)
         </button>
       )}
 
-      {/* Formulaire Stripe si paiement initié */}
+      {/* 2️⃣ Formulaire Stripe si paiement initié */}
       {clientSecret && paymentStatus === "initiated" && (
         <Elements stripe={stripePromise}>
-          <StripeCheckout
-            clientSecret={clientSecret}
-            onPaymentSuccess={setPaymentStatus}
-          />
+          <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} />
         </Elements>
       )}
 
-      {/* Actions disponibles uniquement après paiement bloqué */}
+      {/* 3️⃣ Actions disponibles uniquement après paiement bloqué */}
       {paymentStatus === "pending" && (
         <div style={{ marginTop: 10 }}>
           <p>✅ Paiement bloqué, le solidaire peut maintenant intervenir !</p>
-          {/* Boutons de test pour dev */}
           <button onClick={handleReleaseEscrow} style={{ marginRight: 10 }}>
             Simuler intervention terminée
           </button>
-          <button onClick={handleRefundEscrow}>
-            Simuler annulation
-          </button>
+          <button onClick={handleRefundEscrow}>Simuler annulation</button>
         </div>
       )}
 
-      {/* États finaux */}
+      {/* 4️⃣ États finaux */}
       {paymentStatus === "released" && <p>✅ Paiement libéré au solidaire !</p>}
       {paymentStatus === "refunded" && <p>⚠️ Paiement remboursé.</p>}
     </div>

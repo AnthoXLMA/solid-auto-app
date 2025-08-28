@@ -11,19 +11,20 @@ const escrows = {}; // En prod → stocker en DB
 export const createEscrow = async (reportId, amount, setPaymentStatus) => {
   try {
     if (amount <= 0) {
-      // Montant 0 → pas de Stripe, juste marquer comme séquestre créé
-      escrows[reportId] = { status: "created" };
-      setPaymentStatus("released"); // on considère déjà libéré
+      // Montant 0 → pas de Stripe, on considère déjà libéré
+      escrows[reportId] = { status: "released" };
+      setPaymentStatus("released");
       console.log("💰 Escrow 0 € créé pour report:", reportId);
-      return { success: true, status: "created" };
+      return { success: true, status: "released" };
     }
 
-    setPaymentStatus("pending");
+    // On ne met pas pending ici, juste "initiated" pour afficher Stripe
+    setPaymentStatus("initiated");
 
     const res = await fetch(`${API_URL}/create-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reportId, amount: Math.round(amount * 100) }), // Stripe attend les centimes
+      body: JSON.stringify({ reportId, amount: Math.round(amount * 100) }),
     });
 
     if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
@@ -34,17 +35,18 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
     escrows[reportId] = {
       clientSecret: data.clientSecret,
       paymentIntentId: data.paymentIntentId,
-      status: "pending",
+      status: "initiated",
     };
 
     console.log("✅ Escrow créé pour report:", reportId);
-    return { success: true, clientSecret: data.clientSecret, status: "pending" };
+    return { success: true, clientSecret: data.clientSecret, status: "initiated" };
   } catch (err) {
     console.error("❌ createEscrow:", err.message);
     setPaymentStatus("error");
     return { success: false, error: err.message };
   }
 };
+
 
 /**
  * 2️⃣ Libérer le paiement (capturer le séquestre)
