@@ -97,7 +97,7 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     }
   };
 
-  // Solidaire valide les frais
+  // 🔑 Solidaire valide les frais
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     if (!alerte?.reportId) return;
 
@@ -113,25 +113,42 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       }
 
       const reportData = reportSnap.data();
+      const finalAmount = fraisAnnules ? 0 : montant;
 
       await updateDoc(reportRef, {
         status: "attente séquestre",
         helperUid: user.uid,
         helperConfirmed: true,
-        frais: fraisAnnules ? 0 : montant,
-        notificationForOwner: `🚨 Solidaire en route ! Montant : ${fraisAnnules ? "0 €" : montant + " €"}`,
+        frais: finalAmount,
+        notificationForOwner: `🚨 Solidaire en route ! Montant : ${finalAmount} €`,
       });
+
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      toast.info("Le sinistré doit maintenant séquestrer le montant.");
-      // AcceptModal reste ouverte jusqu'au séquestre
+      // Crée le séquestre
+      const escrowResult = await createEscrow(alerte.reportId, finalAmount, setPaymentStatus);
+
+      if (!escrowResult.success) {
+        toast.error("⚠️ Impossible de créer le paiement. Réessayez plus tard.");
+        return;
+      }
+
+      // Si montant 0 ou séquestre créé → ouvrir InProgress
+      if (escrowResult.status === "created" || finalAmount === 0) {
+        setAcceptModal({ isOpen: false, alerte: null });
+        setInProgressModal({ isOpen: true, report: { id: alerte.reportId, ...reportData } });
+        toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
+      } else {
+        // Sinon on garde AcceptModal ouverte jusqu'au paiement réel
+        toast.info("Le sinistré doit maintenant séquestrer le montant.");
+      }
     } catch (err) {
       console.error("Erreur confirmation frais :", err);
       toast.error("❌ Erreur lors de la validation des frais.");
     }
   };
 
-  // 🔔 Écoute les reports pour séquestre et ouverture InProgressModal
+  // 🔔 Écoute reports pour InProgressModal
   useEffect(() => {
     if (!user) return;
 
@@ -140,16 +157,16 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       snapshot.docs.forEach((docSnap) => {
         const report = { id: docSnap.id, ...docSnap.data() };
 
-        // Montant séquestré
-        if (report.escrowStatus === "created" && !inProgressModal.isOpen) {
-          setAcceptModal({ isOpen: false, alerte: null }); // ferme AcceptModal
-          setInProgressModal({ isOpen: true, report }); // ouvre InProgressModal
+        // Montant séquestré via Stripe
+        if ((report.escrowStatus === "created" || report.frais === 0) && !inProgressModal.isOpen) {
+          setAcceptModal({ isOpen: false, alerte: null });
+          setInProgressModal({ isOpen: true, report });
           toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
         }
 
-        // Alerte rejetée ou autre statut
-        if (report.status === "aide refusée") {
-          if (report.alertId) removeAlertWithAnimation(report.alertId);
+        // Alerte rejetée
+        if (report.status === "aide refusée" && report.alertId) {
+          removeAlertWithAnimation(report.alertId);
         }
       });
     });

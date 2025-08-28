@@ -1,6 +1,6 @@
 // src/components/InProgressModal.jsx
 import React, { useState, useEffect } from "react";
-import { releaseEscrow } from "./services/escrowService";
+import { releaseEscrow } from "../services/escrowService";
 import { toast } from "react-toastify";
 
 export default function InProgressModal({
@@ -18,17 +18,30 @@ export default function InProgressModal({
     if (!isOpen) setLoading(false);
   }, [isOpen, report, solidaire]);
 
-  // Ne rien afficher si props manquantes ou modal fermé
+  // Ne rien afficher si modal fermé ou props manquantes
   if (!isOpen || !report || !solidaire) return null;
 
   const handleComplete = async () => {
     try {
+      // Cas où le montant est 0 € → pas de paiement à libérer
+      if (!report.frais || report.frais <= 0) {
+        toast.success("✅ Dépannage terminé (sans paiement) !");
+        onComplete?.(report.id);
+        onClose?.();
+        return;
+      }
+
       setLoading(true);
       setPaymentStatus?.("releasing");
 
-      await releaseEscrow(report.id, setPaymentStatus);
+      const result = await releaseEscrow(report.id, setPaymentStatus);
 
-      toast.success("💸 Paiement libéré !");
+      if (result.success) {
+        toast.success("💸 Paiement libéré !");
+      } else {
+        toast.error(`❌ Erreur libération paiement : ${result.error}`);
+      }
+
       onComplete?.(report.id);
       onClose?.();
     } catch (err) {
