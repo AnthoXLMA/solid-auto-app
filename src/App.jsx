@@ -52,16 +52,45 @@ export default function App() {
 
   // Auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const userDoc = await getDoc(doc(db, "solidaires", currentUser.uid));
-        setUser(userDoc.exists() ? { ...currentUser, ...userDoc.data() } : currentUser);
-      } else {
-        setUser(null);
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (currentUser) {
+      try {
+        const userRef = doc(db, "solidaires", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          // merge Firestore + Auth
+          setUser({ uid: currentUser.uid, email: currentUser.email, ...userSnap.data() });
+        } else {
+          // si pas de doc Firestore → créer un doc minimal
+          const newUser = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            username: currentUser.displayName || currentUser.email.split("@")[0],
+            materiel: "batterie",
+            online: true,
+          };
+          await setDoc(userRef, newUser);
+          setUser(newUser);
+        }
+      } catch (err) {
+        console.error("Erreur récupération user :", err);
+        setUser(currentUser); // fallback
       }
-    });
-    return () => unsubscribe();
-  }, []);
+    } else {
+      setUser(null);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
+  // Ouvrir automatiquement le modal "Signaler une panne" à l'inscription ou si pas de report actif
+  useEffect(() => {
+    if (user && !activeReport) {
+      setShowReportForm(true);
+    }
+  }, [user, activeReport]);
 
   // LogOut
   const handleLogout = async () => {
@@ -79,7 +108,7 @@ export default function App() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setCurrentPosition([pos.coords.latitude, pos.coords.longitude]),
-        () => setCurrentPosition([43.4923, -1.4746])
+        () => setCurrentPosition([46.959095, 4.858485]) // Beaune, France
       );
     }
   }, []);
@@ -151,6 +180,13 @@ export default function App() {
   return () => unsub();
 }, []);
 
+  useEffect(() => {
+  if (user?.isFirstLogin) {
+    setShowReportForm(true);  // ouvre automatiquement le modal
+    // On peut aussi réinitialiser le flag pour éviter que ça se reproduise
+    setUser((prev) => ({ ...prev, isFirstLogin: false }));
+  }
+}, [user]);
 
   useEffect(() => {
   if (!user) return;
