@@ -20,6 +20,9 @@ import {
   ListItemText,
 } from "@mui/material";
 import zxcvbn from "zxcvbn";
+import { PANNE_TYPES } from "./constants/pannes";
+import { MATERIEL_OPTIONS } from "./constants/materiel";
+
 
 export default function Auth({ setUser }) {
   const [mode, setMode] = useState("login"); // "login" ou "signup"
@@ -28,6 +31,7 @@ export default function Auth({ setUser }) {
   const [username, setUsername] = useState("");
   const [materiel, setMateriel] = useState([]); // tableau pour matériel multiple
   const [passwordStrength, setPasswordStrength] = useState(null);
+  const [pannes, setPannes] = useState([]); // tableau vide au départ
 
   const PANNE_OPTIONS = [
     { value: "pinces", label: "🔋 Pinces (Batterie)" },
@@ -80,6 +84,11 @@ export default function Auth({ setUser }) {
       console.error(error);
       alert("Erreur lors de la création de compte : " + error.message);
     }
+    // Calcul automatique des pannes que l'utilisateur peut dépanner
+    const pannes = materiel.flatMap((m) => {
+      const matOption = MATERIEL_OPTIONS.find((o) => o.value === m);
+      return matOption?.compatible || [];
+    });
   };
 
   return (
@@ -137,7 +146,8 @@ export default function Auth({ setUser }) {
           </Box>
         )}
 
-        {mode === "signup" && (
+
+{/*        {mode === "signup" && (
           <FormControl fullWidth>
             <InputLabel>Matériel disponible</InputLabel>
             <Select
@@ -158,8 +168,55 @@ export default function Auth({ setUser }) {
               ))}
             </Select>
           </FormControl>
+        )}}*/}
+
+
+        {mode === "signup" && (
+        <FormControl fullWidth>
+          <InputLabel>Matériel disponible</InputLabel>
+          <Select
+            multiple
+            value={materiel}
+            onChange={(e) => setMateriel(e.target.value)}
+            renderValue={(selected) =>
+              selected
+                .map((val) => MATERIEL_OPTIONS.find((o) => o.value === val)?.label)
+                .join(", ")
+            }
+          >
+            {MATERIEL_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                <Checkbox checked={materiel.includes(option.value)} />
+                <ListItemText primary={option.label} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         )}
 
+
+{/*        {mode === "signup" && (
+          <FormControl fullWidth>
+            <InputLabel>Pannes que vous pouvez dépanner</InputLabel>
+            <Select
+              multiple
+              value={pannes}
+              onChange={(e) => setPannes(e.target.value)}
+              renderValue={(selected) =>
+                selected
+                  .map((val) => PANNE_TYPES.find((o) => o.value === val)?.label)
+                  .join(", ")
+              }
+            >
+              {PANNE_TYPES.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  <Checkbox checked={pannes.includes(option.value)} />
+                  <ListItemText primary={option.label} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          )}*/}
         <Button
           variant="contained"
           onClick={mode === "login" ? handleLogin : handleSignup}

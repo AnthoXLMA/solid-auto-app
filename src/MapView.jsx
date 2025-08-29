@@ -12,6 +12,7 @@ import InProgressModal from "./InProgressModal";
 import { getDistanceKm } from "./utils/distance";
 import ModalHelperList from "./ModalHelperList";
 import { MATERIEL_OPTIONS } from "./constants/materiel";
+import { findHelpers } from "./utils/matching";
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -203,36 +204,7 @@ const MapView = forwardRef(({
     }
   }
 
-const filteredSolidaires = activeReport
-  ? solidaires.filter((s) => {
-      const isOffline = !s.online;
-
-      // Toujours avoir un tableau
-      const solidaireMateriel = Array.isArray(s.materiel)
-        ? s.materiel
-        : typeof s.materiel === "string"
-        ? [s.materiel]
-        : [];
-
-      // Vérifier compatibilité uniquement si activeReport.nature existe
-      const hasCompatibleMateriel =
-        Boolean(activeReport.nature) &&
-        solidaireMateriel.some((m) => {
-          const matOption = MATERIEL_OPTIONS.find((o) => o.value === m);
-          return matOption?.compatible?.includes(activeReport.nature);
-        });
-
-      // Vérifier si le solidaire a déjà été alerté pour ce report
-      const alertForSolidaire = alerts.some(
-        (a) => a.reportId === activeReport.id && a.toUid === s.uid
-      );
-
-      // Inclure le solidaire s'il est en ligne et compatible, ou s'il a déjà été alerté
-      return (hasCompatibleMateriel && !isOffline) || alertForSolidaire;
-    })
-  : solidaires;
-
-
+  const filteredSolidaires = findHelpers(solidaires, activeReport, alerts, currentUserUid);
 
   const availableHelpers = filteredSolidaires.slice(0, 10); // les 10 premiers helpers, sans filtre
 
@@ -409,7 +381,6 @@ const filteredSolidaires = activeReport
     </>
   );
 });
-
 console.log({ PaymentBanner, AcceptModal, InProgressModal });
 
 export default MapView;
