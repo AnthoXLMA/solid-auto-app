@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import './index.css';
 import Auth from "./Auth";
 import MapView from "./MapView";
@@ -27,8 +27,9 @@ import { updateUserStatus } from "./userService";
 import { useNavigate } from "react-router-dom";
 import { FaGlobe, FaCommentDots, FaBook } from "react-icons/fa";
 import Chat from "./Chat";
-import { useRef } from "react";
 import ProfileForm from "./ProfileForm";
+import AlertHistory from "./AlertHistory";
+
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -41,7 +42,7 @@ export default function App() {
   const [showReportForm, setShowReportForm] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(0);
-  const [page, setPage] = useState("map"); // valeur par défaut
+  const [page, setPage] = useState("map");
   const userReports = useReportsListener(user);
   const mapRef = useRef(null);
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
@@ -49,50 +50,49 @@ export default function App() {
   const [showHelperList, setShowHelperList] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showAlertHistory, setShowAlertHistory] = useState(false);
 
   // Auth
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    if (currentUser) {
-      try {
-        const userRef = doc(db, "solidaires", currentUser.uid);
-        const userSnap = await getDoc(userRef);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        try {
+          const userRef = doc(db, "solidaires", currentUser.uid);
+          const userSnap = await getDoc(userRef);
 
-        if (userSnap.exists()) {
-          // merge Firestore + Auth
-          setUser({ uid: currentUser.uid, email: currentUser.email, ...userSnap.data() });
-        } else {
-          // si pas de doc Firestore → créer un doc minimal
-          const newUser = {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            username: currentUser.displayName || currentUser.email.split("@")[0],
-            materiel: "batterie",
-            online: true,
-          };
-          await setDoc(userRef, newUser);
-          setUser(newUser);
+          if (userSnap.exists()) {
+            setUser({ uid: currentUser.uid, email: currentUser.email, ...userSnap.data() });
+          } else {
+            const newUser = {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              username: currentUser.displayName || currentUser.email.split("@")[0],
+              materiel: "batterie",
+              online: true,
+            };
+            await setDoc(userRef, newUser);
+            setUser(newUser);
+          }
+        } catch (err) {
+          console.error("Erreur récupération user :", err);
+          setUser(currentUser);
         }
-      } catch (err) {
-        console.error("Erreur récupération user :", err);
-        setUser(currentUser); // fallback
+      } else {
+        setUser(null);
       }
-    } else {
-      setUser(null);
-    }
-  });
+    });
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
-  // Ouvrir automatiquement le modal "Signaler une panne" à l'inscription ou si pas de report actif
+  // Ouvrir automatiquement le modal "Signaler une panne"
   useEffect(() => {
     if (user && !activeReport) {
       setShowReportForm(true);
     }
   }, [user, activeReport]);
 
-  // LogOut
+  // Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -132,22 +132,20 @@ export default function App() {
     createFakeUsers();
   }, []);
 
+  // Écoute état authentification
   useEffect(() => {
-  // Écoute l’état de l’authentification
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    if (currentUser) {
-      // L’utilisateur vient de se connecter → dispo + online
-      await updateUserStatus(currentUser.uid, "disponible", true, null);
-    } else {
-      // Il se déconnecte → offline
-      if (auth.currentUser) {
-        await updateUserStatus(auth.currentUser.uid, "disponible", false, null);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        await updateUserStatus(currentUser.uid, "disponible", true, null);
+      } else {
+        if (auth.currentUser) {
+          await updateUserStatus(auth.currentUser.uid, "disponible", false, null);
+        }
       }
-    }
-  });
+    });
 
-  return () => unsubscribe(); // cleanup
-}, []);
+    return () => unsubscribe();
+  }, []);
 
   // Écoute alertes pour l'utilisateur
   useEffect(() => {
@@ -161,59 +159,48 @@ export default function App() {
   }, [user]);
 
   // Écoute solidaires en temps réel
-  // useEffect(() => {
-  //   const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
-  //     setSolidaires(snapshot.docs.map((doc) => doc.data()));
-  //   });
-  //   return () => unsub();
-  // }, []);
-
   useEffect(() => {
-  const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
-    const allSolidaires = snapshot.docs.map((doc) => doc.data());
-    setSolidaires(allSolidaires);
+    const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
+      const allSolidaires = snapshot.docs.map((doc) => doc.data());
+      setSolidaires(allSolidaires);
 
-    // Nombre de solidaires en ligne
-    const onlineCount = allSolidaires.filter((s) => s.online).length;
-    setOnlineUsers(onlineCount);
-  });
-  return () => unsub();
-}, []);
-
-  useEffect(() => {
-  if (user?.isFirstLogin) {
-    setShowReportForm(true);  // ouvre automatiquement le modal
-    // On peut aussi réinitialiser le flag pour éviter que ça se reproduise
-    setUser((prev) => ({ ...prev, isFirstLogin: false }));
-  }
-}, [user]);
-
-  useEffect(() => {
-  if (!user) return;
-  const q = collection(db, "chats");
-  const unsub = onSnapshot(q, (snapshot) => {
-    let count = 0;
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      if (data.participants.includes(user.uid)) {
-        count += data.messages?.filter((m) => !m.read && m.toUid === user.uid).length || 0;
-      }
+      const onlineCount = allSolidaires.filter((s) => s.online).length;
+      setOnlineUsers(onlineCount);
     });
-    setUnreadMessages(count);
-  });
-  return () => unsub();
-}, [user]);
+    return () => unsub();
+  }, []);
+
+  // Premier login
+  useEffect(() => {
+    if (user?.isFirstLogin) {
+      setShowReportForm(true);
+      setUser((prev) => ({ ...prev, isFirstLogin: false }));
+    }
+  }, [user]);
+
+  // Écoute messages non lus
+  useEffect(() => {
+    if (!user) return;
+    const q = collection(db, "chats");
+    const unsub = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.participants.includes(user.uid)) {
+          count += data.messages?.filter((m) => !m.read && m.toUid === user.uid).length || 0;
+        }
+      });
+      setUnreadMessages(count);
+    });
+    return () => unsub();
+  }, [user]);
 
   // Online / Offline
   useEffect(() => {
     if (!user) return;
-
     const userRef = doc(db, "solidaires", user.uid);
-
-    // Marquer comme online quand connecté
     setDoc(userRef, { online: true }, { merge: true }).catch(() => {});
 
-    // Marquer offline quand on quitte
     const handleBeforeUnload = () => {
       setDoc(userRef, { online: false }, { merge: true }).catch(() => {});
     };
@@ -233,7 +220,7 @@ export default function App() {
         doc(db, "solidaires", user.uid),
         {
           uid: user.uid,
-          name: user.name || user.email, // <-- garde le nom existant
+          name: user.name || user.email,
           latitude: currentPosition[0],
           longitude: currentPosition[1],
           materiel: user.materiel || "batterie",
@@ -259,25 +246,24 @@ export default function App() {
     return () => unsub();
   }, [user, activeReport?.id]);
 
+  // Notifications pour l’utilisateur
   useEffect(() => {
-  if (!user) return;
-  const q = query(collection(db, "reports"), where("ownerUid", "==", user.uid));
-  const unsub = onSnapshot(q, (snapshot) => {
-    snapshot.docs.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (data.notificationForOwner) {
-        toast.info(data.notificationForOwner);
-        // Supprimer le champ pour ne pas répéter le toast
-        updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
-      }
+    if (!user) return;
+    const q = query(collection(db, "reports"), where("ownerUid", "==", user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.notificationForOwner) {
+          toast.info(data.notificationForOwner);
+          updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+        }
+      });
     });
-  });
-  return () => unsub();
-}, [user]);
+    return () => unsub();
+  }, [user]);
 
-  //Fonction Navigate pour la redirection des icones du menu flottan
+  // Navigation
   const navigate = useNavigate();
-
   const navigateTo = (path) => {
     navigate(`/${path}`);
     console.log("Naviguer vers :", page);
@@ -305,34 +291,32 @@ export default function App() {
 
   // Filtrage solidaires pour report actif
   const filteredSolidaires = solidaires
-  .filter((s) => s.uid !== user?.uid) // 🔥 exclure le Current User
-  .map((s) => {
-    if (!activeReport) return { ...s, status: "normal" };
+    .filter((s) => s.uid !== user?.uid)
+    .map((s) => {
+      if (!activeReport) return { ...s, status: "normal" };
 
-    const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
-    const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
+      const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
+      const alreadyAlerted = s.alerts?.includes(activeReport.id) || false;
 
-    // ✅ Assurer que materiel est toujours un tableau de strings
-    const materielArray = Array.isArray(s.materiel)
-      ? s.materiel
-      : typeof s.materiel === "string"
-      ? [s.materiel]
-      : [];
+      const materielArray = Array.isArray(s.materiel)
+        ? s.materiel
+        : typeof s.materiel === "string"
+        ? [s.materiel]
+        : [];
 
-    // ✅ Vérifier compatibilité
-    const isRelevant =
-      activeReport.nature &&
-      materielArray.some((m) =>
-        m.toLowerCase().includes(activeReport.nature.toLowerCase())
-      );
+      const isRelevant =
+        activeReport.nature &&
+        materielArray.some((m) =>
+          m.toLowerCase().includes(activeReport.nature.toLowerCase())
+        );
 
-    let status = "irrelevant";
-    if (alreadyAlerted) status = "alerted";
-    else if (isRelevant) status = "relevant";
-    if (pendingAlertsCount > 0) status = "alerted";
+      let status = "irrelevant";
+      if (alreadyAlerted) status = "alerted";
+      else if (isRelevant) status = "relevant";
+      if (pendingAlertsCount > 0) status = "alerted";
 
-    return { ...s, alreadyAlerted, pendingAlertsCount, status };
-  });
+      return { ...s, alreadyAlerted, pendingAlertsCount, status };
+    });
 
   // Alerter un solidaire
   const onAlertUser = async (solidaire) => {
@@ -362,7 +346,7 @@ export default function App() {
     }
   };
 
-  // Annuler un report (seulement si c'est le sien)
+  // Annuler un report
   const cancelReport = async (reportId) => {
     if (!user) return;
     try {
@@ -373,7 +357,6 @@ export default function App() {
       }
 
       const reportData = reportDoc.data();
-      // 🔒 Vérification : seul le ownerUid peut annuler
       if (reportData.ownerUid !== user.uid) {
         toast.error("⛔ Vous ne pouvez pas annuler la panne d'un autre utilisateur !");
         return;
@@ -388,52 +371,43 @@ export default function App() {
     }
   };
 
+  // Chat Button
   function ChatButton({ activeReport, unreadMessages }) {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const handleClick = () => {
-    if (activeReport?.helperConfirmed) {
-      // Il y a une intervention en cours → ouvrir le chat
-      setIsChatOpen(true);
-    } else {
-      // Pas d'intervention → message informatif
-      toast.info("Vous n'avez aucune panne à signaler - souhaitez-vous signaler une panne ?");
-    }
-  };
+    const handleClick = () => {
+      if (activeReport?.helperConfirmed) {
+        setIsChatOpen(true);
+      } else {
+        toast.info("Vous n'avez aucune panne à signaler - souhaitez-vous signaler une panne ?");
+      }
+    };
 
     return (
-    <>
-      <button
-        onClick={handleClick}
-        className="flex flex-col items-center relative"
-      >
-        <FaCommentDots size={24} />
-        <span className="text-xs mt-1">Chat</span>
-        {unreadMessages > 0 && activeReport?.helperConfirmed && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
-            {unreadMessages}
-          </span>
+      <>
+        <button onClick={handleClick} className="flex flex-col items-center relative">
+          <FaCommentDots size={24} />
+          <span className="text-xs mt-1">Chat</span>
+          {unreadMessages > 0 && activeReport?.helperConfirmed && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+              {unreadMessages}
+            </span>
+          )}
+        </button>
+
+        {isChatOpen && (
+          <Chat reportId={activeReport.id} onClose={() => setIsChatOpen(false)} />
         )}
-      </button>
+      </>
+    );
+  }
 
-      {/* Popup du chat */}
-      {isChatOpen && (
-        <Chat
-          reportId={activeReport.id}
-          onClose={() => setIsChatOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
-  // Si pas d'utilisateur connecté, afficher Auth
   if (!user) return <Auth setUser={setUser} />;
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
-        <h1 className="text-xl font-bold">Bienvenue { user.username || user.email}</h1>
+        <h1 className="text-xl font-bold">Bienvenue {user.username || user.email}</h1>
         <div className="relative">
           <button
             onClick={() => setShowProfileMenu((prev) => !prev)}
@@ -444,13 +418,11 @@ export default function App() {
 
           {showProfileMenu && (
             <div className="absolute right-0 mt-2 w-48 bg-white text-black shadow-lg rounded-lg z-50">
-              <div className="px-4 py-2 border-b font-medium">
-                {user.username || "Utilisateur"}
-              </div>
+              <div className="px-4 py-2 border-b font-medium">{user.username || "Utilisateur"}</div>
               <button
                 onClick={() => {
                   setShowProfileForm(true);
-                  setShowProfileMenu(false); // ferme le menu quand on clique sur éditer
+                  setShowProfileMenu(false);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
@@ -467,162 +439,153 @@ export default function App() {
         </div>
       </header>
 
+      <main className="flex-1 relative bg-gray-100">
+        {/* Carte */}
+        <div className="absolute inset-0">
+          <MapView
+            reports={reports}
+            solidaires={filteredSolidaires}
+            alerts={alerts}
+            userPosition={currentPosition}
+            onPositionChange={setCurrentPosition}
+            onReportClick={setActiveReport}
+            onAlertUser={onAlertUser}
+            activeReport={activeReport}
+            selectedAlert={selectedAlert}
+            cancelReport={cancelReport}
+            currentUserUid={user.uid}
+            ref={mapRef}
+            showHelperList={showHelperList}
+            setShowHelperList={setShowHelperList}
+          />
+        </div>
 
-  <main className="flex-1 relative bg-gray-100">
-  {/* Carte occupe tout */}
-  <div className="absolute inset-0">
-    <MapView
-      reports={reports}
-      solidaires={filteredSolidaires}
-      alerts={alerts}
-      userPosition={currentPosition}
-      onPositionChange={setCurrentPosition}
-      onReportClick={setActiveReport}
-      onAlertUser={onAlertUser}
-      activeReport={activeReport}
-      selectedAlert={selectedAlert}
-      cancelReport={cancelReport}
-      currentUserUid={user.uid}
-      ref={mapRef}
-      showHelperList={showHelperList}
-      setShowHelperList={setShowHelperList}
-    />
-  </div>
+        {showProfileForm && (
+          <ProfileForm
+            user={user}
+            onClose={() => setShowProfileForm(false)}
+            onUpdate={(updatedUser) => {
+              const sanitizedUser = {
+                uid: updatedUser.uid,
+                name: updatedUser.name,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                materiel: updatedUser.materiel,
+                latitude: updatedUser.latitude || 43.4923,
+                longitude: updatedUser.longitude || -1.4746,
+              };
+              setUser(sanitizedUser);
+              setDoc(doc(db, "solidaires", sanitizedUser.uid), sanitizedUser, { merge: true });
+            }}
+          />
+        )}
 
+        {/* Menu flottant */}
+        <div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-between items-center z-50">
+          {/* Gauche */}
+          <div className="flex items-center space-x-4 ml-4">
+            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+              ⚡ {reports.length}
+            </span>
+            <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center justify-center">
+              <FaGlobe size={24} />
+            </button>
+          </div>
 
-  {showProfileForm && (
-  <ProfileForm
-    user={user}
-    onClose={() => setShowProfileForm(false)}
-    onUpdate={(updatedUser) => {
-    // Créer un objet propre pour Firestore
-      const sanitizedUser = {
-        uid: updatedUser.uid,
-        name: updatedUser.name,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        materiel: updatedUser.materiel,
-      };
+          {/* Centre */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 -top-10 z-50">
+            <button
+              onClick={() => setShowReportForm(true)}
+              className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
+            >
+              +
+            </button>
+          </div>
 
-      setUser(sanitizedUser); // met à jour le state local
-      setDoc(doc(db, "solidaires", sanitizedUser.uid), sanitizedUser, { merge: true });
-    }}
-  />
-)}
+          {/* Droite */}
+          <div className="flex items-center space-x-4 mr-4">
+            <button
+              onClick={() => {
+                if (activeReport?.helperConfirmed) {
+                  navigateTo("chat");
+                } else {
+                  toast.info("💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici.");
+                }
+              }}
+              className="flex flex-col items-center relative"
+            >
+              <FaCommentDots size={24} />
+              {unreadMessages > 0 && activeReport?.helperConfirmed && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+                  {unreadMessages}
+                </span>
+              )}
+            </button>
 
+            <button
+              onClick={() => setShowAlertHistory(true)}
+              className="flex flex-col items-center relative"
+            >
+              <FaBook size={24} />
+              {alerts.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center justify-center animate-pulse">
+                  {alerts.length}
+                </span>
+              )}
+            </button>
 
-{/* Menu flottant style Instagram avec bouton + centré responsive */}
-<div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 sm:py-5 md:py-6 flex justify-between items-center z-50">
-  {/* Gauche du menu */}
-  <div className="flex items-center space-x-4 ml-4">
-    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-      ⚡ {reports.length}
-    </span>
-    <button
-      onClick={() => mapRef.current?.recenter()}
-      className="flex flex-col items-center justify-center"
-    >
-      <FaGlobe size={24} />
-    </button>
-  </div>
+            <button
+              onClick={() => setShowHelperList(true)}
+              className="flex flex-col items-center relative"
+            >
+              👥
+              <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                {onlineUsers}
+              </span>
+            </button>
+          </div>
+        </div>
 
-  {/* Centre : bouton + */}
-  <div className="absolute left-1/2 transform -translate-x-1/2 -top-10 sm:-top-12 md:-top-14 z-50">
-    <button
-      onClick={() => setShowReportForm(true)}
-      className="w-16 sm:w-18 md:w-20 h-16 sm:h-18 md:h-20 bg-blue-600 hover:bg-blue-700
-                 rounded-full shadow-2xl flex items-center justify-center
-                 text-white text-4xl sm:text-5xl md:text-6xl font-bold border-4 border-white
-                 leading-none text-center
-                 transition-transform hover:scale-110"
-    >
-      +
-    </button>
-  </div>
+        {/* Bottom sheets */}
+        {showReportForm && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
+            <ReportForm
+              userPosition={currentPosition}
+              onNewReport={(r) => {
+                handleNewReport(r);
+                setShowReportForm(false);
+              }}
+              onClose={() => setShowReportForm(false)}
+            />
+            <button
+              onClick={() => setShowReportForm(false)}
+              className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
+            >
+              Fermer
+            </button>
+          </div>
+        )}
 
-  {/* Droite du menu */}
-  <div className="flex items-center space-x-4 mr-4">
-    {/* Chat */}
-    <button
-      onClick={() => {
-        if (activeReport?.helperConfirmed) {
-          navigateTo("chat");
-        } else {
-          toast.info(
-            "💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici."
-          );
-        }
-      }}
-      className="flex flex-col items-center relative"
-    >
-      <FaCommentDots size={24} />
-      {unreadMessages > 0 && activeReport?.helperConfirmed && (
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
-          {unreadMessages}
-        </span>
-      )}
-    </button>
+        {user && alerts.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
+            <AlertsListener
+              user={user}
+              setSelectedAlert={setSelectedAlert}
+              userPosition={currentPosition}
+            />
+          </div>
+        )}
 
-    {/* Feed */}
-    <button
-      onClick={() => navigateTo("feed")}
-      className="flex flex-col items-center"
-    >
-      <FaBook size={24} />
-    </button>
+        {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
+          <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
+            <PayButton report={activeReport} />
+          </div>
+        )}
 
-    {/* Icône utilisateurs */}
-    <button
-      onClick={() => setShowHelperList(true)}
-      className="flex flex-col items-center relative"
-    >
-      👥
-      <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-        {onlineUsers}
-      </span>
-    </button>
-  </div>
-</div>
-
-  {/* Bottom sheet : Report Form */}
-  {showReportForm && (
-    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
-      <ReportForm
-        userPosition={currentPosition}
-        onNewReport={(r) => {
-          handleNewReport(r);
-          setShowReportForm(false);
-        }}
-      onClose={() => setShowReportForm(false)}
-      />
-      <button
-        onClick={() => setShowReportForm(false)}
-        className="mt-2 w-full bg-gray-200 py-2 rounded-lg"
-      >
-        Fermer
-      </button>
-    </div>
-  )}
-
-  {/* Bottom sheet : Alertes */}
-  {user && alerts.length > 0 && (
-    <div className="fixed bottom-0 left-0 right-0 bg-yellow-50 border-t border-yellow-300 p-4 rounded-t-2xl shadow-lg z-40">
-      <AlertsListener
-        user={user}
-        setSelectedAlert={setSelectedAlert}
-        userPosition={currentPosition}
-      />
-    </div>
-  )}
-
-  {/* Paiement : affiché comme une card flottante */}
-  {activeReport && activeReport.helperUid && activeReport.status === "aide en cours" && user?.uid === activeReport.ownerUid && (
-    <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
-      <PayButton report={activeReport} />
-    </div>
-  )}
-</main>
-
+        {showAlertHistory && (
+          <AlertHistory alerts={alerts} onClose={() => setShowAlertHistory(false)} />
+        )}
+      </main>
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
         © {new Date().getFullYear()} U-Boto - Tous droits réservés
@@ -632,4 +595,3 @@ export default function App() {
     </div>
   );
 }
-
