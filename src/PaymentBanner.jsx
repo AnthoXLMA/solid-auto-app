@@ -153,67 +153,60 @@ export default function PaymentBanner({ report, solidaire }) {
     if (result.success) setPaymentStatus("refunded");
   };
 
-  return (
-    <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
-  <h2 className="text-center text-lg font-semibold mb-2">
-    🚗 {solidaire.name} est en route !
-  </h2>
-  <p className="text-center text-gray-700 mb-4">
-    💰 Frais : <span className="font-bold">{report.frais} €</span>
-  </p>
+   return (
+  <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
+    <h2 className="text-center text-lg font-semibold mb-2">
+      {paymentStatus === "pending" || paymentStatus === "released"
+        ? `🚗 ${solidaire.name} est en route !`
+        : "💳 Paiement requis"}
+    </h2>
+    <p className="text-center text-gray-700 mb-4">
+      💰 Frais : <span className="font-bold">{report.frais} €</span>
+    </p>
 
-  {paymentStatus === null && (
-    <button
-      onClick={handleCreateEscrow}
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-    >
-      Bloquer le paiement (Escrow)
-    </button>
-  )}
+    {/* 1️⃣ Création du PaymentIntent */}
+    {paymentStatus === null && (
+      <button
+        onClick={handleCreateEscrow}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+      >
+        Bloquer le paiement (Escrow)
+      </button>
+    )}
 
-  {clientSecret && paymentStatus === "initiated" && (
-    <Elements stripe={stripePromise}>
-      <StripeCheckout
-        clientSecret={clientSecret}
-        onPaymentSuccess={setPaymentStatus}
-        report={report}   // ✅ on passe bien report ici
-      />
-    </Elements>
-  )}
+    {/* 2️⃣ Saisie carte bancaire */}
+    {clientSecret && paymentStatus === "initiated" && (
+      <Elements stripe={stripePromise}>
+        <StripeCheckout
+          clientSecret={clientSecret}
+          onPaymentSuccess={setPaymentStatus}
+          report={report}
+        />
+      </Elements>
+    )}
 
-  {paymentStatus === "pending" && (
-    <div className="space-y-2 text-center mt-4">
-      <div className="bg-green-50 border border-green-200 text-green-600 p-2 rounded text-sm">
-        ✅ Paiement bloqué, le solidaire peut intervenir !
+    {/* 3️⃣ Une fois que Stripe a confirmé le blocage */}
+    {paymentStatus === "pending" && (
+      <div className="space-y-2 text-center mt-4">
+        <div className="bg-green-50 border border-green-200 text-green-600 p-2 rounded text-sm">
+          ✅ Paiement bloqué, le solidaire peut intervenir !
+        </div>
+        <div className="flex gap-2 justify-center mt-2">
+          <button
+            onClick={handleReleaseEscrow}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
+          >
+            Terminer intervention
+          </button>
+          <button
+            onClick={handleRefundEscrow}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition"
+          >
+            Annuler
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2 justify-center mt-2">
-        <button
-          onClick={handleReleaseEscrow}
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
-        >
-          Terminer intervention
-        </button>
-        <button
-          onClick={handleRefundEscrow}
-          className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition"
-        >
-          Annuler
-        </button>
-      </div>
-    </div>
-  )}
-
-  {paymentStatus === "released" && (
-    <div className="bg-green-50 border border-green-200 text-green-600 p-2 rounded text-center mt-4">
-      ✅ Paiement libéré au solidaire !
-    </div>
-  )}
-
-  {paymentStatus === "refunded" && (
-    <div className="bg-red-50 border border-red-200 text-red-600 p-2 rounded text-center mt-4">
-      ⚠️ Paiement remboursé.
-    </div>
-  )}
-</div>
+    )}
+  </div>
 );
-}
+
