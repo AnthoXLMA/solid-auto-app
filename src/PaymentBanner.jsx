@@ -2,6 +2,10 @@ import React, { useState } from "react";
 import { createEscrow, releaseEscrow, refundEscrow } from "./services/escrowService";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "./firebase";
+import { toast } from "react-toastify";
+
 
 // Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
@@ -11,7 +15,46 @@ if (!process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY) {
 }
 
 // --- StripeCheckout Component ---
-function StripeCheckout({ clientSecret, onPaymentSuccess }) {
+// function StripeCheckout({ clientSecret, onPaymentSuccess }) {
+//   const stripe = useStripe();
+//   const elements = useElements();
+//   const [status, setStatus] = useState("");
+//   const [loading, setLoading] = useState(false);
+
+  // const handlePay = async () => {
+  //   if (!stripe || !elements) return;
+  //   setLoading(true);
+  //   try {
+  //     const result = await stripe.confirmCardPayment(clientSecret, {
+  //       payment_method: { card: elements.getElement(CardElement) },
+  //     });
+
+  //     if (result.error) {
+  //       setStatus(`❌ ${result.error.message}`);
+  //       onPaymentSuccess(null);
+  //     } else {
+  //       console.log("PaymentIntent reçu :", result.paymentIntent);
+
+  //       if (result.paymentIntent.status === "requires_capture") {
+  //         setStatus("✅ Paiement bloqué en séquestre !");
+  //         onPaymentSuccess("pending");
+  //       } else if (result.paymentIntent.status === "succeeded") {
+  //         setStatus("✅ Paiement capturé immédiatement !");
+  //         onPaymentSuccess("released");
+  //       } else {
+  //         setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
+  //         onPaymentSuccess(null);
+  //       }
+  //     }
+  //   } catch (err) {
+  //     setStatus("❌ Erreur : " + err.message);
+  //     onPaymentSuccess(null);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
   const stripe = useStripe();
   const elements = useElements();
   const [status, setStatus] = useState("");
@@ -28,13 +71,19 @@ function StripeCheckout({ clientSecret, onPaymentSuccess }) {
       if (result.error) {
         setStatus(`❌ ${result.error.message}`);
         onPaymentSuccess(null);
-      } else {
-        console.log("PaymentIntent reçu :", result.paymentIntent);
+      } else if (result.paymentIntent) {
+        const pi = result.paymentIntent;
 
-        if (result.paymentIntent.status === "requires_capture") {
+        if (pi.status === "requires_capture") {
           setStatus("✅ Paiement bloqué en séquestre !");
           onPaymentSuccess("pending");
-        } else if (result.paymentIntent.status === "succeeded") {
+
+          // 🔑 Mise à jour Firestore
+          const reportRef = doc(db, "reports", report.id);
+          await updateDoc(reportRef, { escrowStatus: "created" });
+
+          toast.success("💰 Montant séquestré ! Le solidaire peut maintenant intervenir.");
+        } else if (pi.status === "succeeded") {
           setStatus("✅ Paiement capturé immédiatement !");
           onPaymentSuccess("released");
         } else {
@@ -124,7 +173,11 @@ export default function PaymentBanner({ report, solidaire }) {
 
   {clientSecret && paymentStatus === "initiated" && (
     <Elements stripe={stripePromise}>
-      <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} />
+      <StripeCheckout
+        clientSecret={clientSecret}
+        onPaymentSuccess={setPaymentStatus}
+        report={report}   // ✅ on passe bien report ici
+      />
     </Elements>
   )}
 
