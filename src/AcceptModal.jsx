@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { calculateFees } from "./utils/calculateFees";
 
 /**
  * AcceptModal
@@ -11,7 +12,15 @@ import React, { useState } from "react";
  * - onStartRepair : function optionnelle, lance le modal InProgress pour le solidaire
  */
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
-  const [montant, setMontant] = useState(0);
+  const distanceKm = alerte?.distance || 0;
+  const fraisCalculés = calculateFees(distanceKm);
+
+  const [montant, setMontant] = useState(fraisCalculés);
+
+  // 🔄 Recalculer montant si alerte change
+  useEffect(() => {
+    setMontant(fraisCalculés);
+  }, [fraisCalculés]);
 
   if (!isOpen || !alerte) return null;
 
@@ -29,8 +38,8 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in">
         <h2 className="text-lg font-bold mb-4">Confirmer le dépannage</h2>
         <p className="mb-4 text-sm text-gray-700">
-          Souhaitez-vous <strong>conserver</strong> les frais de la course
-          (frais kilométriques + 20%) ou les <strong>annuler</strong> ?
+          Souhaitez-vous <strong>conserver</strong> les frais de la course ({fraisCalculés} € estimés)
+          ou les <strong>annuler</strong> ?
         </p>
 
         <div className="mb-4">

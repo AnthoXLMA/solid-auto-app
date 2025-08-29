@@ -1,21 +1,30 @@
-// ModalHelperList.jsx
 import React, { useState } from "react";
 import { getDistanceKm } from "./utils/distance";
 
 export default function ModalHelperList({ helpers, onClose, userPosition, onAlert, activeReport }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  if (!helpers || helpers.length === 0) return null;
+  // ✅ Filtrer les helpers pour ne garder que ceux avec coords valides
+  const validHelpers = helpers.filter(
+    (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
+  );
 
-  const currentHelper = helpers[currentIndex];
-  const distance = getDistanceKm(userPosition[0], userPosition[1], currentHelper.latitude, currentHelper.longitude);
+  if (!validHelpers || validHelpers.length === 0) return null;
+
+  const currentHelper = validHelpers[currentIndex];
+  const distance = getDistanceKm(
+    userPosition[0],
+    userPosition[1],
+    currentHelper.latitude,
+    currentHelper.longitude
+  );
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? helpers.length - 1 : prev - 1));
+    setCurrentIndex((prev) => (prev === 0 ? validHelpers.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev === helpers.length - 1 ? 0 : prev + 1));
+    setCurrentIndex((prev) => (prev === validHelpers.length - 1 ? 0 : prev + 1));
   };
 
   return (

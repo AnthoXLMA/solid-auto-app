@@ -26,9 +26,14 @@ export function findHelpers(solidaires, activeReport, alerts, currentUserUid) {
       (a) => a.reportId === activeReport.id && a.toUid === s.uid
     );
 
+    // ✅ Vérifier que le solidaire a des coordonnées valides
+    const hasCoords =
+      typeof s.latitude === "number" && typeof s.longitude === "number";
+
     return (
       s.uid !== currentUserUid && // ne pas s’alerter soi-même
-      ((hasCompatibleMateriel && !isOffline) || alertForSolidaire)
+      ((hasCompatibleMateriel && !isOffline) || alertForSolidaire) &&
+      hasCoords
     );
   });
 }
