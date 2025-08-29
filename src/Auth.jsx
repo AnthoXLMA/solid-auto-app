@@ -20,24 +20,30 @@ import {
   ListItemText,
 } from "@mui/material";
 import zxcvbn from "zxcvbn";
-import { PANNE_TYPES } from "./constants/pannes";
 import { MATERIEL_OPTIONS } from "./constants/materiel";
 
+// --- Helper pour calculer le score et le niveau ---
+const calculateScore = (expertise_materiel, points_experience = 0, avis = []) => {
+  const matScore = Object.values(expertise_materiel).reduce((sum, val) => sum + (val ? 20 : 0), 0);
+  const experienceScore = points_experience;
+  const avisScore = avis.length > 0 ? avis.reduce((a, b) => a + b.note, 0) / avis.length * 20 : 0;
+  const score_global = Math.round(0.4 * matScore + 0.4 * experienceScore + 0.2 * avisScore);
+
+  let niveau = "Débutant 🌱";
+  if (score_global > 30) niveau = "Intermédiaire ⚡";
+  if (score_global > 60) niveau = "Expert 🔥";
+  if (score_global > 85) niveau = "Expert confirmé 🏆";
+
+  return { score_global, niveau };
+};
 
 export default function Auth({ setUser }) {
-  const [mode, setMode] = useState("login"); // "login" ou "signup"
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [materiel, setMateriel] = useState([]); // tableau pour matériel multiple
+  const [materiel, setMateriel] = useState([]);
   const [passwordStrength, setPasswordStrength] = useState(null);
-  const [pannes, setPannes] = useState([]); // tableau vide au départ
-
-  const PANNE_OPTIONS = [
-    { value: "pinces", label: "🔋 Pinces (Batterie)" },
-    { value: "cric", label: "🛞 Cric (Pneu)" },
-    { value: "jerrican", label: "⛽ Jerrican (Carburant)" },
-  ];
 
   const handlePasswordChange = (e) => {
     const val = e.target.value;
@@ -60,16 +66,32 @@ export default function Auth({ setUser }) {
       alert("Veuillez saisir un nom d'utilisateur.");
       return;
     }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Créer document Firestore
+      // Créer l'objet expertise_materiel
+      const expertise_materiel = MATERIEL_OPTIONS.reduce((acc, o) => {
+        acc[o.value] = materiel.includes(o.value);
+        return acc;
+      }, {});
+
+      // Calcul du score initial et niveau
+      const { score_global, niveau } = calculateScore(expertise_materiel);
+
+      // Création du document Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
         username,
-        materiel, // maintenant tableau
+        materiel,
+        expertise_materiel,
+        points_experience: 0,
+        avis: [],
+        score_global,
+        niveau,
+        badges: [],
         online: true,
         latitude: null,
         longitude: null,
@@ -79,17 +101,16 @@ export default function Auth({ setUser }) {
         ...user,
         username,
         materiel,
-        isFirstLogin: true, // <-- flag ajouté
+        expertise_materiel,
+        score_global,
+        niveau,
+        isFirstLogin: true,
       });
+
     } catch (error) {
       console.error(error);
       alert("Erreur lors de la création de compte : " + error.message);
     }
-    // Calcul automatique des pannes que l'utilisateur peut dépanner
-    const pannes = materiel.flatMap((m) => {
-      const matOption = MATERIEL_OPTIONS.find((o) => o.value === m);
-      return matOption?.compatible || [];
-    });
   };
 
   return (
@@ -147,8 +168,7 @@ export default function Auth({ setUser }) {
           </Box>
         )}
 
-
-{/*        {mode === "signup" && (
+        {mode === "signup" && (
           <FormControl fullWidth>
             <InputLabel>Matériel disponible</InputLabel>
             <Select
@@ -157,11 +177,11 @@ export default function Auth({ setUser }) {
               onChange={(e) => setMateriel(e.target.value)}
               renderValue={(selected) =>
                 selected
-                  .map((val) => PANNE_OPTIONS.find((o) => o.value === val)?.label)
+                  .map((val) => MATERIEL_OPTIONS.find((o) => o.value === val)?.label)
                   .join(", ")
               }
             >
-              {PANNE_OPTIONS.map((option) => (
+              {MATERIEL_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   <Checkbox checked={materiel.includes(option.value)} />
                   <ListItemText primary={option.label} />
@@ -169,55 +189,8 @@ export default function Auth({ setUser }) {
               ))}
             </Select>
           </FormControl>
-        )}}*/}
-
-
-        {mode === "signup" && (
-        <FormControl fullWidth>
-          <InputLabel>Matériel disponible</InputLabel>
-          <Select
-            multiple
-            value={materiel}
-            onChange={(e) => setMateriel(e.target.value)}
-            renderValue={(selected) =>
-              selected
-                .map((val) => MATERIEL_OPTIONS.find((o) => o.value === val)?.label)
-                .join(", ")
-            }
-          >
-            {MATERIEL_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                <Checkbox checked={materiel.includes(option.value)} />
-                <ListItemText primary={option.label} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
         )}
 
-
-{/*        {mode === "signup" && (
-          <FormControl fullWidth>
-            <InputLabel>Pannes que vous pouvez dépanner</InputLabel>
-            <Select
-              multiple
-              value={pannes}
-              onChange={(e) => setPannes(e.target.value)}
-              renderValue={(selected) =>
-                selected
-                  .map((val) => PANNE_TYPES.find((o) => o.value === val)?.label)
-                  .join(", ")
-              }
-            >
-              {PANNE_TYPES.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  <Checkbox checked={pannes.includes(option.value)} />
-                  <ListItemText primary={option.label} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          )}*/}
         <Button
           variant="contained"
           onClick={mode === "login" ? handleLogin : handleSignup}

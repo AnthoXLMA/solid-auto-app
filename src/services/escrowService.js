@@ -1,4 +1,8 @@
 // src/services/escrowService.js
+import { recalcUserScore } from "../utils/userScoreService"; // 🔹 chemin ajusté selon ta structure
+
+
+
 const API_URL = "http://localhost:4242";
 
 // Stock temporaire des escrows (en mémoire)
@@ -48,12 +52,9 @@ export const createEscrow = async (reportId, amount, setPaymentStatus) => {
 
 /**
  * 2️⃣ Libérer le paiement (capturer le séquestre)
- */
-/**
- * 2️⃣ Libérer le paiement (capturer le séquestre)
  * Supporte reportId ou paymentIntentId
  */
-export const releaseEscrow = async (reportOrPaymentIntentId, setPaymentStatus) => {
+export const releaseEscrow = async (reportOrPaymentIntentId, solidaireUid, setPaymentStatus) => {
   try {
     if (typeof setPaymentStatus !== "function") setPaymentStatus = () => {};
 
@@ -95,6 +96,12 @@ export const releaseEscrow = async (reportOrPaymentIntentId, setPaymentStatus) =
       escrow.status = "released";
       setPaymentStatus("released");
       console.log("💸 Paiement libéré pour report:", reportId);
+
+      // 🔹 recalcul du score utilisateur après libération
+      if (solidaireUid) {
+        await recalcUserScore(solidaireUid);
+      }
+
       return { success: true, status: "released" };
     } else {
       throw new Error(data.error || "Erreur release-payment");
@@ -106,25 +113,23 @@ export const releaseEscrow = async (reportOrPaymentIntentId, setPaymentStatus) =
   }
 };
 
-
 /**
  * 3️⃣ Rembourser (si annulé)
  * Supporte reportId ou paymentIntentId
  */
-export const refundEscrow = async (reportOrPaymentIntentId, setPaymentStatus) => {
+export const refundEscrow = async (reportOrPaymentIntentId, solidaireUid, setPaymentStatus) => {
   try {
     if (typeof setPaymentStatus !== "function") setPaymentStatus = () => {};
 
-    // Identifier l'escrow
     let escrow;
     let reportId;
 
     if (reportOrPaymentIntentId.startsWith("pi_")) {
-      escrow = Object.entries(escrows).find(
+      const found = Object.entries(escrows).find(
         ([_, e]) => e.paymentIntentId === reportOrPaymentIntentId
       );
-      if (!escrow) throw new Error("Escrow introuvable pour ce PaymentIntentId");
-      [reportId, escrow] = escrow;
+      if (!found) throw new Error("Escrow introuvable pour ce PaymentIntentId");
+      [reportId, escrow] = found;
     } else {
       reportId = reportOrPaymentIntentId;
       escrow = escrows[reportId];
@@ -151,6 +156,12 @@ export const refundEscrow = async (reportOrPaymentIntentId, setPaymentStatus) =>
       escrow.status = "refunded";
       setPaymentStatus("refunded");
       console.log("🔄 Paiement remboursé pour report:", reportId);
+
+      // 🔹 recalcul du score utilisateur après remboursement
+      if (solidaireUid) {
+        await recalcUserScore(solidaireUid);
+      }
+
       return { success: true, status: "refunded" };
     } else {
       throw new Error(data.error || "Erreur refund-payment");
@@ -161,4 +172,3 @@ export const refundEscrow = async (reportOrPaymentIntentId, setPaymentStatus) =>
     return { success: false, error: err.message };
   }
 };
-
