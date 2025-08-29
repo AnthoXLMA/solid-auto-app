@@ -209,4 +209,4 @@ export default function PaymentBanner({ report, solidaire }) {
     )}
   </div>
 );
-
+}
