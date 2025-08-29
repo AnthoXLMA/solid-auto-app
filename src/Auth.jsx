@@ -79,6 +79,7 @@ export default function Auth({ setUser }) {
         ...user,
         username,
         materiel,
+        isFirstLogin: true, // <-- flag ajouté
       });
     } catch (error) {
       console.error(error);
