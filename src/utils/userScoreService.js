@@ -1,6 +1,6 @@
 // src/utils/userScoreService.js
 import { db } from "../firebase"; // 🔹 chemin corrigé
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 
 export const recalcUserScore = async (uid) => {
