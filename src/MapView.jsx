@@ -287,6 +287,9 @@ const MapView = forwardRef(({
                 <Typography>
                   ⭐ Note moyenne : {reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} ({reviewsMap[s.uid]?.count || 0} avis)
                 </Typography>
+                <Typography>
+                  🏷 Rôle : {s.role ? s.role.replace(/_/g, " ") : "Non spécifié"}
+                </Typography>
                 Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"} <br />
                 📏 Distance : {distance} km <br />
                 {status === "available" && "✅ Disponible"}

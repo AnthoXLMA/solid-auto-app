@@ -508,8 +508,6 @@ export default function App() {
           />
         )}
 
-        {/* ...tout le reste des bottom sheets, modals et notifications */}
-
         {/* Menu flottant */}
         <div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-between items-center z-50">
           {/* Gauche */}
@@ -517,10 +515,7 @@ export default function App() {
             <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
               ⚡ {reports.length}
             </span>
-            <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center justify-center">
-              <FaGlobe size={24} />
-              <span className="text-xs mt-1">Map</span>
-            </button>
+
             {/* Dashboard */}
               <button
                 onClick={() => setPage("dashboard")}
@@ -532,7 +527,13 @@ export default function App() {
 
               {/* Retour Carte */}
               <button
-                onClick={() => setPage("map")}
+                onClick={() => {
+                  if (page !== "map") {
+                    setPage("map"); // on ouvre la carte
+                  } else {
+                    mapRef.current?.recenter(); // on recentre si déjà sur la map
+                  }
+                }}
                 className="flex flex-col items-center justify-center"
               >
                 <FaMapMarkedAlt size={24} />
