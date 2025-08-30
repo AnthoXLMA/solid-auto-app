@@ -97,6 +97,7 @@ export default function Auth({ setUser }) {
         online: true,
         latitude: null,
         longitude: null,
+        hasSeenFirstPanneModal: false, // <--- clé importante
       });
 
       setUser({
@@ -107,6 +108,7 @@ export default function Auth({ setUser }) {
         score_global,
         niveau,
         isFirstLogin: true,
+        hasSeenFirstPanneModal: false,
       });
 
     } catch (error) {
