@@ -89,7 +89,6 @@ export default function Auth({ setUser }) {
         materiel,
         expertise_materiel,
         points_experience: 0,
-        avis: [],
         score_global,
         niveau,
         badges: [],

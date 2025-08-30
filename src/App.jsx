@@ -29,7 +29,8 @@ import { FaGlobe, FaCommentDots, FaBook } from "react-icons/fa";
 import Chat from "./Chat";
 import ProfileForm from "./ProfileForm";
 import AlertHistory from "./AlertHistory";
-
+import { FaTachometerAlt, FaMapMarkedAlt } from "react-icons/fa";
+import Dashboard from "./Dashboard";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -52,7 +53,6 @@ export default function App() {
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [showAlertHistory, setShowAlertHistory] = useState(false);
   const [showPanneModal, setShowPanneModal] = useState(false);
-
 
   // Auth
   useEffect(() => {
@@ -464,26 +464,30 @@ export default function App() {
       </header>
 
       <main className="flex-1 relative bg-gray-100">
-        {/* Carte */}
-        <div className="absolute inset-0">
-          <MapView
-            reports={reports}
-            solidaires={filteredSolidaires}
-            alerts={alerts}
-            userPosition={currentPosition}
-            onPositionChange={setCurrentPosition}
-            onReportClick={setActiveReport}
-            onAlertUser={onAlertUser}
-            activeReport={activeReport}
-            selectedAlert={selectedAlert}
-            cancelReport={cancelReport}
-            currentUserUid={user.uid}
-            ref={mapRef}
-            showHelperList={showHelperList}
-            setShowHelperList={setShowHelperList}
-          />
-        </div>
+        {page === "map" && (
+          <div className="absolute inset-0">
+            <MapView
+              reports={reports}
+              solidaires={filteredSolidaires}
+              alerts={alerts}
+              userPosition={currentPosition}
+              onPositionChange={setCurrentPosition}
+              onReportClick={setActiveReport}
+              onAlertUser={onAlertUser}
+              activeReport={activeReport}
+              selectedAlert={selectedAlert}
+              cancelReport={cancelReport}
+              currentUserUid={user.uid}
+              ref={mapRef}
+              showHelperList={showHelperList}
+              setShowHelperList={setShowHelperList}
+            />
+          </div>
+        )}
 
+        {page === "dashboard" && <Dashboard user={user} />}
+
+        {/* Garder les modals/bottom sheets */}
         {showProfileForm && (
           <ProfileForm
             user={user}
@@ -504,6 +508,8 @@ export default function App() {
           />
         )}
 
+        {/* ...tout le reste des bottom sheets, modals et notifications */}
+
         {/* Menu flottant */}
         <div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-between items-center z-50">
           {/* Gauche */}
@@ -513,7 +519,25 @@ export default function App() {
             </span>
             <button onClick={() => mapRef.current?.recenter()} className="flex flex-col items-center justify-center">
               <FaGlobe size={24} />
+              <span className="text-xs mt-1">Map</span>
             </button>
+            {/* Dashboard */}
+              <button
+                onClick={() => setPage("dashboard")}
+                className="flex flex-col items-center justify-center"
+              >
+                <FaTachometerAlt size={24} />
+                <span className="text-xs mt-1">Dashboard</span>
+              </button>
+
+              {/* Retour Carte */}
+              <button
+                onClick={() => setPage("map")}
+                className="flex flex-col items-center justify-center"
+              >
+                <FaMapMarkedAlt size={24} />
+                <span className="text-xs mt-1">Carte</span>
+              </button>
           </div>
 
           {/* Centre */}
@@ -539,6 +563,7 @@ export default function App() {
               className="flex flex-col items-center relative"
             >
               <FaCommentDots size={24} />
+              <span className="text-xs mt-1">Chat</span>
               {unreadMessages > 0 && activeReport?.helperConfirmed && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
                   {unreadMessages}
@@ -551,6 +576,7 @@ export default function App() {
               className="flex flex-col items-center relative"
             >
               <FaBook size={24} />
+              <span className="text-xs mt-1">Feed</span>
               {alerts.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center justify-center animate-pulse">
                   {alerts.length}
@@ -620,8 +646,6 @@ export default function App() {
             onClose={() => setShowPanneModal(false)}
           />
         )}
-
-
       </main>
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
