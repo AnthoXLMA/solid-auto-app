@@ -44,6 +44,7 @@ export default function Auth({ setUser }) {
   const [username, setUsername] = useState("");
   const [materiel, setMateriel] = useState([]);
   const [passwordStrength, setPasswordStrength] = useState(null);
+  const [role, setRole] = useState("");
 
   const handlePasswordChange = (e) => {
     const val = e.target.value;
@@ -92,6 +93,7 @@ export default function Auth({ setUser }) {
         score_global,
         niveau,
         badges: [],
+        role, // rôle choisi
         online: true,
         latitude: null,
         longitude: null,
@@ -112,6 +114,24 @@ export default function Auth({ setUser }) {
       alert("Erreur lors de la création de compte : " + error.message);
     }
   };
+
+  const ROLES = [
+    {
+      value: "automobiliste_equipe",
+      label: "Automobiliste",
+      description: "Automobiliste occasionnel, en capacité de dépanner avec un matériel de première nécessité."
+    },
+    {
+      value: "automobiliste_intervenant_confirme",
+      label: "Dépanneur Occasionnel",
+      description: "Dépanneur occasionnel, capable d’intervenir régulièrement avec une bonne connaissance mécanique."
+    },
+    {
+      value: "professionnel_expert_certifie",
+      label: "Professionnel Certifié",
+      description: "Professionnel du milieu automobile (garagiste, dépanneur reconnu, services agréés)."
+    }
+  ];
 
   return (
     <Box
@@ -166,6 +186,27 @@ export default function Auth({ setUser }) {
               {["Très faible", "Faible", "Moyen", "Fort", "Très fort"][passwordStrength]}
             </Typography>
           </Box>
+        )}
+
+        {mode === "signup" && (
+          <FormControl fullWidth>
+            <InputLabel>Rôle</InputLabel>
+            <Select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              {ROLES.map((r) => (
+                <MenuItem key={r.value} value={r.value}>
+                  {r.label}
+                </MenuItem>
+              ))}
+            </Select>
+            {role && (
+              <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
+                {ROLES.find((r) => r.value === role)?.description}
+              </Typography>
+            )}
+          </FormControl>
         )}
 
         {mode === "signup" && (
