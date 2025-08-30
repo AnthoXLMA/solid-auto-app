@@ -13,7 +13,7 @@ import { getDistanceKm } from "./utils/distance";
 import ModalHelperList from "./ModalHelperList";
 import { findHelpers } from "./utils/matching";
 import { FaUser } from "react-icons/fa";
-
+import { collection, updateDoc } from "firebase/firestore";
 
 // === Icônes ===
 const currentUserIcon = new L.Icon({
@@ -150,6 +150,23 @@ const MapView = forwardRef(({
     return () => clearInterval(interval);
   }, [activeReport, solidaires, userPosition]);
 
+  // Toast pour refus de demande de dépannage
+    useEffect(() => {
+      if (!currentUserUid) return;
+
+      const q = collection(db, "reports");
+      const unsub = onSnapshot(q, (snapshot) => {
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data.ownerUid === currentUserUid && data.notificationForOwner) {
+            toast.info(data.notificationForOwner);
+            updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+          }
+        });
+      });
+      return () => unsub();
+    }, [currentUserUid]);
+
   if (!userPosition || userPosition.length < 2 || userPosition[0] == null || userPosition[1] == null)
     return <div>📍 Localisation en cours...</div>;
 
@@ -180,24 +197,6 @@ const MapView = forwardRef(({
       </div>
     );
   }
-
-    // Toast pour refus de demande de dépannage
-    useEffect(() => {
-    if (!user) return;
-
-    const q = collection(db, "reports");
-    const unsub = onSnapshot(q, (snapshot) => {
-      snapshot.docs.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.ownerUid === user.uid && data.notificationForOwner) {
-          toast.info(data.notificationForOwner);
-          // On supprime la notification pour éviter de la répéter
-          updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
-        }
-      });
-    });
-    return () => unsub();
-  }, [user]);
 
   const canPay = activeReport?.helperConfirmed && activeReport?.status === "aide en cours" && activeReport?.frais > 0;
 
