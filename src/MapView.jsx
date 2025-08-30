@@ -181,6 +181,24 @@ const MapView = forwardRef(({
     );
   }
 
+    // Toast pour refus de demande de dépannage
+    useEffect(() => {
+    if (!user) return;
+
+    const q = collection(db, "reports");
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.ownerUid === user.uid && data.notificationForOwner) {
+          toast.info(data.notificationForOwner);
+          // On supprime la notification pour éviter de la répéter
+          updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+        }
+      });
+    });
+    return () => unsub();
+  }, [user]);
+
   const canPay = activeReport?.helperConfirmed && activeReport?.status === "aide en cours" && activeReport?.frais > 0;
 
   return (

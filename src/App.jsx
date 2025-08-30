@@ -51,6 +51,8 @@ export default function App() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [showAlertHistory, setShowAlertHistory] = useState(false);
+  const [showPanneModal, setShowPanneModal] = useState(false);
+
 
   // Auth
   useEffect(() => {
@@ -86,11 +88,32 @@ export default function App() {
   }, []);
 
   // Ouvrir automatiquement le modal "Signaler une panne"
+  // useEffect(() => {
+  //   if (user && !activeReport) {
+  //     setShowReportForm(true);
+  //   }
+  // }, [user, activeReport]);
+
+  // Ouvrir le modal "Signaler une panne" uniquement à l'inscription
   useEffect(() => {
-    if (user && !activeReport) {
-      setShowReportForm(true);
+  const checkFirstModal = async () => {
+    if (!user?.uid) return;
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      if (!data.hasSeenFirstPanneModal) {
+        setShowPanneModal(true); // afficher le modal
+        await updateDoc(userRef, { hasSeenFirstPanneModal: true }); // marquer comme vu
+      }
     }
-  }, [user, activeReport]);
+  };
+
+  checkFirstModal();
+}, [user]);
+
 
   // Logout
   const handleLogout = async () => {
@@ -402,6 +425,7 @@ export default function App() {
     );
   }
 
+
   if (!user) return <Auth setUser={setUser} />;
 
   return (
@@ -585,6 +609,19 @@ export default function App() {
         {showAlertHistory && (
           <AlertHistory alerts={alerts} onClose={() => setShowAlertHistory(false)} />
         )}
+
+        {showPanneModal && (
+          <ReportForm
+            userPosition={currentPosition}
+            onNewReport={(r) => {
+              handleNewReport(r);
+              setShowPanneModal(false);
+            }}
+            onClose={() => setShowPanneModal(false)}
+          />
+        )}
+
+
       </main>
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
