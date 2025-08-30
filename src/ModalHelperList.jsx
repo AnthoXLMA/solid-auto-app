@@ -1,13 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { getDistanceKm } from "./utils/distance";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
 
 export default function ModalHelperList({ helpers, onClose, userPosition, onAlert, activeReport }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [reviewsMap, setReviewsMap] = useState({}); // { [uid]: { averageNote: 4.5, count: 3 } }
 
   // ✅ Filtrer les helpers pour ne garder que ceux avec coords valides
   const validHelpers = helpers.filter(
     (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
+
+  // ✅ Récupérer les avis pour chaque helper
+  useEffect(() => {
+    const fetchReviews = async () => {
+      const map = {};
+      await Promise.all(
+        validHelpers.map(async (h) => {
+          const q = query(collection(db, "reviews"), where("toUid", "==", h.uid));
+          const snap = await getDocs(q);
+          const avis = snap.docs.map(d => d.data());
+          const averageNote = avis.length > 0
+            ? avis.reduce((sum, r) => sum + r.note, 0) / avis.length
+            : 0;
+          map[h.uid] = { averageNote, count: avis.length };
+        })
+      );
+      setReviewsMap(map);
+    };
+    fetchReviews();
+  }, [validHelpers]);
 
   if (!validHelpers || validHelpers.length === 0) return null;
 
@@ -33,21 +56,28 @@ export default function ModalHelperList({ helpers, onClose, userPosition, onAler
         <h3 className="text-center text-xl font-bold mb-4">Utilisateurs disponibles</h3>
 
         <div className="flex items-center justify-between">
-          {/* Flèche gauche */}
-          <button
-            onClick={handlePrev}
-            className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
-          >
-            ←
-          </button>
+          <button onClick={handlePrev} className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300">←</button>
 
-          {/* Carte du helper */}
           <div className="flex-1 mx-4 p-4 border rounded-2xl shadow flex flex-col items-center
-                          h-[250px] w-full max-w-xs overflow-y-auto">
+                          h-[280px] w-full max-w-xs overflow-y-auto">
             <div className="font-medium text-lg text-center">{currentHelper.name}</div>
-            <div className="text-sm text-gray-500 text-center mt-2">
-              Matériel: {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
+
+            {/* Rôle */}
+            <div className="text-sm text-gray-500 text-center mt-1">
+              🏷 Rôle : {currentHelper.role ? currentHelper.role.replace(/_/g, " ") : "Non spécifié"}
             </div>
+
+            {/* Note moyenne + nb avis */}
+            <div className="text-sm text-gray-500 text-center mt-1">
+              ⭐ Note : {reviewsMap[currentHelper.uid]?.averageNote?.toFixed(1) || "N/A"} ({reviewsMap[currentHelper.uid]?.count || 0} avis)
+            </div>
+
+            {/* Matériel */}
+            <div className="text-sm text-gray-500 text-center mt-2">
+              Matériel : {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
+            </div>
+
+            {/* Distance */}
             <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance} km</div>
 
             <button
@@ -60,22 +90,10 @@ export default function ModalHelperList({ helpers, onClose, userPosition, onAler
             </button>
           </div>
 
-          {/* Flèche droite */}
-          <button
-            onClick={handleNext}
-            className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300"
-          >
-            →
-          </button>
+          <button onClick={handleNext} className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300">→</button>
         </div>
 
-        {/* Bouton fermer */}
-        <button
-          onClick={onClose}
-          className="mt-4 w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-        >
-          Fermer
-        </button>
+        <button onClick={onClose} className="mt-4 w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Fermer</button>
       </div>
     </div>
   );
