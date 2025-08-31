@@ -19,7 +19,7 @@ import { updateUserStatus } from "./userService";
 // import { createEscrow, releaseEscrow } from "../backend/escrowService";
 import HelpBanner from "./HelpBanner";
 
-export default function AlertsListener({ user, setSelectedAlert }) {
+export default function AlertsListener({ user, setSelectedAlert, userPosition }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
