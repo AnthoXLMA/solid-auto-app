@@ -250,8 +250,18 @@ const MapView = forwardRef(({
           <HelperBanner activeReport={activeReport} solidaires={filteredSolidairesWithCoords} userPosition={userPosition} />
         )}
         {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
-          <PaymentBanner report={activeReport} solidaire={filteredSolidairesWithCoords.find(s => s.uid === activeReport.helperUid)} />
+          <PaymentBanner
+            report={activeReport}
+            solidaire={
+              filteredSolidairesWithCoords.find(s => s.uid === activeReport.helperUid) ||
+              { uid: activeReport.helperUid, name: activeReport.helperName, stripeAccountId: activeReport.solidaireStripeId }
+            }
+            currentUser={currentUser}
+            isSinistre={currentUser.uid !== activeReport.helperUid}
+          />
         )}
+      )}
+
 
 
 {/*        {canPay && <PayButton report={activeReport} />}*/}
