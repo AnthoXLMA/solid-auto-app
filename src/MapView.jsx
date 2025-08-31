@@ -252,7 +252,11 @@ const MapView = forwardRef(({
         {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
           <PaymentBanner report={activeReport} solidaire={filteredSolidairesWithCoords.find(s => s.uid === activeReport.helperUid)} />
         )}
-        {canPay && <PayButton report={activeReport} />}
+
+
+{/*        {canPay && <PayButton report={activeReport} />}*/}
+
+
         <Marker position={userPosition} icon={currentUserIcon}>
           <Popup>🙋‍♂️ Vous êtes ici</Popup>
         </Marker>
