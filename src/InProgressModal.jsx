@@ -95,6 +95,7 @@ export default function InProgressModal({
   };
 
   return (
+
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in relative">
         <h2 className="text-lg font-bold mb-4">Dépannage en cours</h2>
@@ -105,7 +106,15 @@ export default function InProgressModal({
         <p className="mb-2"><strong>Localisation :</strong> {report.latitude}, {report.longitude}</p>
         {distance && <p className="mb-2"><strong>Distance restante :</strong> {distance} km</p>}
         {report.materiel && <p className="mb-2"><strong>Matériel :</strong> {report.materiel}</p>}
-
+        {/*// juste après les infos du rapport et avant les boutons*/}
+          {report && solidaire && (
+            <PaymentBanner
+              report={report}
+              solidaire={solidaire}
+              currentUser={userPosition?.uid ? { uid: userPosition.uid } : { uid: "sinistre" }} // adapte selon ton contexte
+              isSinistre={true} // ici on sait que le currentUser est le sinistré
+            />
+          )}
         <div className="flex gap-2 mt-4">
           <button
             onClick={handleArrived}
