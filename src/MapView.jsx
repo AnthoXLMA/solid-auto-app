@@ -249,7 +249,10 @@ const MapView = forwardRef(({
         {activeReport?.helperConfirmed && activeReport.helperUid && (
           <HelperBanner activeReport={activeReport} solidaires={filteredSolidairesWithCoords} userPosition={userPosition} />
         )}
-        {activeReport?.helperConfirmed && activeReport.helperUid && activeReport.frais > 0 && (
+        {activeReport?.helperConfirmed &&
+         activeReport.helperUid &&
+         activeReport.frais > 0 &&
+         currentUser && (
           <PaymentBanner
             report={activeReport}
             solidaire={
@@ -258,11 +261,16 @@ const MapView = forwardRef(({
             }
             currentUser={currentUser}
             isSinistre={currentUser.uid !== activeReport.helperUid}
+            style={{
+              position: "absolute",
+              top: 10,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 1000,
+            }}
           />
         )}
       )}
-
-
 
 {/*        {canPay && <PayButton report={activeReport} />}*/}
 
