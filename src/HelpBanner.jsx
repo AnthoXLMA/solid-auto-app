@@ -11,14 +11,14 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return (R * c).toFixed(1); // en km
+  return Number((R * c).toFixed(1)); // renvoyer un number
 }
 
 function HelpBanner({ report, onComplete }) {
   const [distance, setDistance] = useState(null);
 
   useEffect(() => {
-    if (!report || !report.latitude || !report.longitude) return;
+    if (!report || report.latitude == null || report.longitude == null) return;
 
     const interval = setInterval(() => {
       if (navigator.geolocation) {
@@ -37,7 +37,6 @@ function HelpBanner({ report, onComplete }) {
     return () => clearInterval(interval);
   }, [report]);
 
-  // ✅ Vérification après les hooks
   if (!report) return null;
 
   return (
@@ -61,7 +60,7 @@ function HelpBanner({ report, onComplete }) {
     >
       🚗 Vous êtes en route pour aider{" "}
       <strong>{report.ownerName || "un utilisateur"}</strong>
-      {distance && <span>📏 Distance restante : {distance} km</span>}
+      {distance != null && <span>📏 Distance restante : {distance} km</span>}
       <button
         style={{
           marginTop: "6px",
@@ -72,7 +71,7 @@ function HelpBanner({ report, onComplete }) {
           padding: "4px 8px",
           cursor: "pointer",
         }}
-        onClick={onComplete}
+        onClick={() => onComplete && onComplete()}
       >
         ✅ Intervention terminée
       </button>
