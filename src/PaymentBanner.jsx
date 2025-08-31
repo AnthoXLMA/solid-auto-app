@@ -8,10 +8,6 @@ import { toast } from "react-toastify";
 // Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-if (!process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY) {
-  console.error("❌ Clé publique Stripe manquante dans .env !");
-}
-
 // --- StripeCheckout Component ---
 function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
   const stripe = useStripe();
@@ -35,9 +31,8 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
 
         if (pi.status === "requires_capture" || pi.status === "succeeded") {
           setStatus("✅ Paiement validé !");
-          onPaymentSuccess("pending"); // statut pending
+          onPaymentSuccess("pending");
 
-          // Mise à jour Firestore
           const reportRef = doc(db, "reports", report.id);
           await updateDoc(reportRef, { escrowStatus: "created" });
 
@@ -85,11 +80,13 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
 }
 
 // --- PaymentBanner Component ---
-export default function PaymentBanner({ report, solidaire }) {
+export default function PaymentBanner({ report, solidaire, currentUser }) {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
   if (!report || !solidaire) return null;
+
+  const isSolidaire = currentUser.uid === solidaire.uid;
 
   // Création du PaymentIntent
   const handleCreateEscrow = async () => {
@@ -99,7 +96,6 @@ export default function PaymentBanner({ report, solidaire }) {
     }
 
     try {
-      console.log("💳 Solidaire pour paiement :", solidaire);
       const response = await fetch("http://localhost:4242/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +130,6 @@ export default function PaymentBanner({ report, solidaire }) {
           paymentIntentId: report.paymentIntentId,
         }),
       });
-
       const data = await response.json();
 
       if (data.success) {
@@ -160,7 +155,6 @@ export default function PaymentBanner({ report, solidaire }) {
           paymentIntentId: report.paymentIntentId,
         }),
       });
-
       const data = await response.json();
 
       if (data.success) {
@@ -177,7 +171,8 @@ export default function PaymentBanner({ report, solidaire }) {
 
   return (
     <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
-      {!solidaire.stripeAccountId ? (
+      {/* Affiche création de compte Stripe seulement pour le solidaire */}
+      {isSolidaire && !solidaire.stripeAccountId ? (
         <div className="text-center p-4">
           ℹ️ Vous devez créer un compte Stripe pour recevoir le paiement.
           <button
