@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getDistanceKm } from "./utils/distance";
+import PaymentBanner from "./PaymentBanner";
 
 export default function InProgressModal({
   isOpen,
