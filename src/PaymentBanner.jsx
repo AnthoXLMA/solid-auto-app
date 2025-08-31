@@ -84,43 +84,40 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
-  // 🔒 Protection complète contre undefined
+  // 🔒 Protection contre undefined
   if (!report || !solidaire || !currentUser) return null;
 
   const isSolidaire = currentUser.uid === solidaire.uid;
 
+  const handleCreateEscrow = async () => {
+    if (!solidaire?.stripeAccountId) {
+      toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
+      return;
+    }
+    try {
+      const response = await fetch("http://localhost:4242/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportId: report.id,
+          amount: report.frais,
+          solidaireStripeId: solidaire.stripeAccountId || null,
+        }),
+      });
+      const data = await response.json();
 
-    // Création du PaymentIntent
-    const handleCreateEscrow = async () => {
-        if (!solidaire?.stripeAccountId) {
-          toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
-          return;
-        }
-      try {
-        const response = await fetch("http://localhost:4242/create-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reportId: report.id,
-            amount: report.frais,
-            solidaireStripeId: solidaire.stripeAccountId || null, // ✅ null si pas encore onboardé
-          }),
-        });
-        const data = await response.json();
-
-        if (data.clientSecret) {
-          setClientSecret(data.clientSecret);
-          setPaymentStatus("initiated");
-        } else {
-          toast.error("❌ Impossible de créer le séquestre");
-        }
-      } catch (err) {
-        console.error("Erreur createEscrow frontend:", err);
-        toast.error("❌ Erreur côté client");
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+        setPaymentStatus("initiated");
+      } else {
+        toast.error("❌ Impossible de créer le séquestre");
       }
-    };
+    } catch (err) {
+      console.error("Erreur createEscrow frontend:", err);
+      toast.error("❌ Erreur côté client");
+    }
+  };
 
-  // Libération et remboursement inchangés
   const handleReleaseEscrow = async () => {
     if (!report?.paymentIntentId) return;
     try {
@@ -161,106 +158,100 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
     }
   };
 
-  console.log({currentUser, isSinistre, paymentStatus, solidaire})
-
   return (
     <>
-    {/* Solidaire doit créer un compte Stripe */}
-    {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
-      <div className="text-center">
-        <p className="text-gray-700">
-          ℹ️ Pour recevoir votre paiement, vous devez créer un compte Stripe.
-        </p>
-        <button
-          onClick={async () => {
-            const res = await fetch("http://localhost:4242/create-stripe-account", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ uid: solidaire.uid, email: solidaire.email }),
-            });
-            const data = await res.json();
-            if (data.url) window.location.href = data.url;
-          }}
-          className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition"
-        >
-          🚀 Créer mon compte Stripe
-        </button>
-      </div>
-  ) : (
-    <>
-      {/* Titre */}
-      <h2 className="text-center text-lg font-semibold mb-2">
-        {paymentStatus === "pending" || paymentStatus === "released"
-          ? `🚗 ${solidaire.name} est en route !`
-          : "💳 Paiement requis"}
-      </h2>
-
-      {/* Frais */}
-      <p className="text-center text-gray-600 mb-4">
-        💰 Frais : <span className="font-bold text-gray-900">{report.frais} €</span>
-      </p>
-
-      {/* --- ÉTATS --- */}
-
-      {/* 1. Pas encore payé → bouton sinistré */}
-      {paymentStatus === null && isSinistre && (
-        <button
-          onClick={handleCreateEscrow}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition"
-        >
-          🔒 Payer et séquestrer les fonds
-        </button>
-      )}
-
-      {/* 2. Checkout Stripe affiché */}
-      {clientSecret && paymentStatus === "initiated" && (
-        <Elements stripe={stripePromise}>
-          <StripeCheckout
-            clientSecret={clientSecret}
-            onPaymentSuccess={setPaymentStatus}
-            report={report}
-          />
-        </Elements>
-      )}
-
-      {/* 3. Paiement bloqué */}
-      {paymentStatus === "pending" && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center space-y-3">
-          <p className="text-green-700 font-medium">
-            ✅ Paiement bloqué — le solidaire peut intervenir.
+      {/* Solidaire doit créer un compte Stripe */}
+      {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
+        <div className="text-center">
+          <p className="text-gray-700">
+            ℹ️ Pour recevoir votre paiement, vous devez créer un compte Stripe.
           </p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleReleaseEscrow}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg transition"
-            >
-              ✅ Terminer
-            </button>
-            <button
-              onClick={handleRefundEscrow}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition"
-            >
-              ❌ Annuler
-            </button>
-          </div>
+          <button
+            onClick={async () => {
+              const res = await fetch("http://localhost:4242/create-stripe-account", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ uid: solidaire.uid, email: solidaire.email }),
+              });
+              const data = await res.json();
+              if (data.url) window.location.href = data.url;
+            }}
+            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition"
+          >
+            🚀 Créer mon compte Stripe
+          </button>
         </div>
-      )}
+      ) : (
+        <>
+          <h2 className="text-center text-lg font-semibold mb-2">
+            {paymentStatus === "pending" || paymentStatus === "released"
+              ? `🚗 ${solidaire.name} est en route !`
+              : "💳 Paiement requis"}
+          </h2>
 
-      {/* 4. Intervention terminée */}
-      {paymentStatus === "released" && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center text-blue-700 font-medium">
-          🎉 Intervention terminée, paiement libéré au solidaire.
-        </div>
-      )}
+          <p className="text-center text-gray-600 mb-4">
+            💰 Frais : <span className="font-bold text-gray-900">{report.frais} €</span>
+          </p>
 
-      {/* 5. Remboursé */}
-      {paymentStatus === "refunded" && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center text-red-700 font-medium">
-          💸 Paiement remboursé au sinistré.
-        </div>
+          {/* 1. Pas encore payé → bouton sinistré */}
+          {paymentStatus === null && isSinistre && (
+            <button
+              onClick={handleCreateEscrow}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition"
+            >
+              🔒 Payer et séquestrer les fonds
+            </button>
+          )}
+
+          {/* 2. Checkout Stripe */}
+          {clientSecret && paymentStatus === "initiated" && (
+            <Elements stripe={stripePromise}>
+              <StripeCheckout
+                clientSecret={clientSecret}
+                onPaymentSuccess={setPaymentStatus}
+                report={report}
+              />
+            </Elements>
+          )}
+
+          {/* 3. Paiement bloqué */}
+          {paymentStatus === "pending" && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center space-y-3">
+              <p className="text-green-700 font-medium">
+                ✅ Paiement bloqué — le solidaire peut intervenir.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReleaseEscrow}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg transition"
+                >
+                  ✅ Terminer
+                </button>
+                <button
+                  onClick={handleRefundEscrow}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition"
+                >
+                  ❌ Annuler
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Intervention terminée */}
+          {paymentStatus === "released" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center text-blue-700 font-medium">
+              🎉 Intervention terminée, paiement libéré au solidaire.
+            </div>
+          )}
+
+          {/* 5. Remboursé */}
+          {paymentStatus === "refunded" && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center text-red-700 font-medium">
+              💸 Paiement remboursé au sinistré.
+            </div>
+          )}
+        </>
       )}
     </>
-  )}
-</div>
   );
 }
