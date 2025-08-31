@@ -161,6 +161,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
     }
   };
 
+  console.log({currentUser, isSinistre, paymentStatus, solidaire})
   return (
 
   <div className="fixed top-6 left-1/2 -translate-x-1/2 w-[420px] bg-white border border-gray-200 shadow-xl rounded-2xl p-6 z-[9999] pointer-events-auto">
