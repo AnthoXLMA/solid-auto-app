@@ -191,13 +191,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         report={inProgressModal.report || null} // Sécurisé
         onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
       />
-      <PaymentBanner
-          report={report}
-          solidaire={solidaire}
-          currentUser={currentUser}
-          isSinistre={currentUser.uid !== solidaire.uid}
-        />
-
 
       {alerts.length === 0 ? (
         <p>Aucune alerte pour l’instant</p>
