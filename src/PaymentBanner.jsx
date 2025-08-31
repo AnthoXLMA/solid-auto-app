@@ -84,13 +84,14 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
-  if (!report || !solidaire) return null;
+  // 🔒 Protection complète contre undefined
+  if (!report || !solidaire || !currentUser) return null;
 
   const isSolidaire = currentUser.uid === solidaire.uid;
 
   // Création du PaymentIntent
   const handleCreateEscrow = async () => {
-    if (!solidaire.stripeAccountId) {
+    if (!solidaire?.stripeAccountId) {
       toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
       return;
     }
@@ -119,8 +120,9 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
     }
   };
 
-  // Libération du paiement
+  // Libération et remboursement inchangés
   const handleReleaseEscrow = async () => {
+    if (!report?.paymentIntentId) return;
     try {
       const response = await fetch("http://localhost:4242/release-payment", {
         method: "POST",
@@ -131,21 +133,16 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
         }),
       });
       const data = await response.json();
-
-      if (data.success) {
-        setPaymentStatus("released");
-        toast.success("✅ Paiement libéré !");
-      } else {
-        toast.error("❌ Impossible de libérer le paiement");
-      }
+      if (data.success) setPaymentStatus("released");
+      else toast.error("❌ Impossible de libérer le paiement");
     } catch (err) {
-      console.error("Erreur releaseEscrow frontend:", err);
+      console.error(err);
       toast.error("❌ Erreur côté client");
     }
   };
 
-  // Remboursement
   const handleRefundEscrow = async () => {
+    if (!report?.paymentIntentId) return;
     try {
       const response = await fetch("http://localhost:4242/refund-payment", {
         method: "POST",
@@ -156,31 +153,22 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
         }),
       });
       const data = await response.json();
-
-      if (data.success) {
-        setPaymentStatus("refunded");
-        toast.success("💸 Paiement remboursé");
-      } else {
-        toast.error("❌ Impossible de rembourser");
-      }
+      if (data.success) setPaymentStatus("refunded");
+      else toast.error("❌ Impossible de rembourser");
     } catch (err) {
-      console.error("Erreur refundEscrow frontend:", err);
+      console.error(err);
       toast.error("❌ Erreur côté client");
     }
   };
 
   return (
     <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
-      {/* Affiche création de compte Stripe seulement pour le solidaire */}
-      {!solidaire?.stripeAccountId || !solidaire?.uid || !solidaire?.email ? (
+      {/* Bouton création compte Stripe uniquement si solidaire et email définis */}
+      {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
         <div className="text-center p-4">
           ℹ️ Vous devez créer un compte Stripe pour recevoir le paiement.
           <button
             onClick={async () => {
-              if (!solidaire?.uid || !solidaire?.email) {
-                toast.error("❌ Données utilisateur manquantes !");
-                return;
-              }
               const res = await fetch("http://localhost:4242/create-stripe-account", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
