@@ -80,7 +80,7 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
 }
 
 // --- PaymentBanner Component ---
-export default function PaymentBanner({ report, solidaire, currentUser }) {
+export default function PaymentBanner({ report, solidaire, currentUser, isSinistre }) {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
