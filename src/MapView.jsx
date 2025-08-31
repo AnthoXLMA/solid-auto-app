@@ -6,7 +6,7 @@ import { onSnapshot, doc, collection, updateDoc, query, where, getDocs } from "f
 import { toast } from "react-toastify";
 import { db } from "./firebase";
 import PaymentBanner from "./PaymentBanner";
-import PayButton from "./PayButton";
+// import PayButton from "./PayButton";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import { getDistanceKm } from "./utils/distance";
