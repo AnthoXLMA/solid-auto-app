@@ -115,6 +115,7 @@ const MapView = forwardRef(({
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // Filter helpers avec coords valides
   const filteredSolidairesWithCoords = findHelpers(solidaires, activeReport, alerts, currentUserUid);
@@ -261,6 +262,8 @@ const MapView = forwardRef(({
             }
             currentUser={currentUser}
             isSinistre={currentUser.uid !== activeReport.helperUid}
+            paymentStatus={paymentStatus}
+            setPaymentStatus={setPaymentStatus}
             style={{
               position: "absolute",
               top: 10,
