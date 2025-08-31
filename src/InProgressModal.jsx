@@ -1,4 +1,4 @@
-// src/components/InProgressModal.jsx
+// src/InProgressModal.jsx
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getDistanceKm } from "./utils/distance";
