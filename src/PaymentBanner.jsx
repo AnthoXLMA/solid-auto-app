@@ -163,33 +163,6 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
 
   console.log({currentUser, isSinistre, paymentStatus, solidaire})
   return (
-
-  <div className="fixed top-6 left-1/2 -translate-x-1/2 w-[420px] bg-white border border-gray-200 shadow-xl rounded-2xl p-6 z-[9999] pointer-events-auto">
-    {/* --- Progress Bar --- */}
-    <div className="relative mb-6">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
-        <span>Paiement</span>
-        <span>Intervention</span>
-        <span>Terminé</span>
-      </div>
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full transition-all duration-500 ${
-            paymentStatus === null
-              ? "w-1/4 bg-gray-400"
-              : paymentStatus === "initiated"
-              ? "w-1/2 bg-blue-500"
-              : paymentStatus === "pending"
-              ? "w-2/3 bg-yellow-500"
-              : paymentStatus === "released"
-              ? "w-full bg-green-600"
-              : paymentStatus === "refunded"
-              ? "w-full bg-red-500"
-              : "w-0"
-          }`}
-        ></div>
-      </div>
-    </div>
   {/* Solidaire doit créer un compte Stripe */}
   {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
     <div className="text-center">
