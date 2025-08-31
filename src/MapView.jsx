@@ -5,76 +5,41 @@ import L from "leaflet";
 import { onSnapshot, doc, collection, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { db } from "./firebase";
-import PaymentBanner from "./PaymentBanner";
-// import PayButton from "./PayButton";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
-import { getDistanceKm } from "./utils/distance";
+import ActiveRepairModal from "./ActiveRepairModal";
+import PaymentBanner from "./PaymentBanner";
 import ModalHelperList from "./ModalHelperList";
+import { getDistanceKm } from "./utils/distance";
 import { findHelpers } from "./utils/matching";
 import { Typography } from "@mui/material";
 
 // === Icônes ===
-const currentUserIcon = new L.Icon({
-  iconUrl: "https://img.icons8.com/?size=100&id=fsoiqMUp0O4v&format=png&color=000000",
-  iconSize: [60, 60],
-});
-
-const reportIcon = new L.Icon({
-  iconUrl: "https://img.icons8.com/?size=100&id=U12vJQsF1INo&format=png&color=000000",
-  iconSize: [45, 45],
-});
+const currentUserIcon = new L.Icon({ iconUrl: "https://img.icons8.com/?size=100&id=fsoiqMUp0O4v&format=png&color=000000", iconSize: [60, 60] });
+const reportIcon = new L.Icon({ iconUrl: "https://img.icons8.com/?size=100&id=U12vJQsF1INo&format=png&color=000000", iconSize: [45, 45] });
 
 const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   let baseIconUrl;
   switch (status) {
-    case "alerted":
-      baseIconUrl = "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000";
-      break;
-    case "busy":
-      baseIconUrl = "https://img.icons8.com/?size=100&id=59817&format=png&color=000000";
-      break;
+    case "alerted": baseIconUrl = "https://img.icons8.com/?size=100&id=I24lanX6Nq71&format=png&color=000000"; break;
+    case "busy": baseIconUrl = "https://img.icons8.com/?size=100&id=59817&format=png&color=000000"; break;
     case "offline":
-      return L.divIcon({
-        className: "solidaire-offline-icon",
-        html: `<div style="position: relative; display: inline-block; text-align:center;">
-                <span style="font-size:28px; color:gray;">👤</span>
-                ${pendingAlertsCount ? `<span class="pulse-badge">${pendingAlertsCount}</span>` : ""}
-               </div>`,
-        iconSize: [35, 35],
-        iconAnchor: [18, 18],
-      });
-    default:
-      baseIconUrl = "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
+      return L.divIcon({ className: "solidaire-offline-icon", html: `<div style="position: relative; display: inline-block; text-align:center;"><span style="font-size:28px; color:gray;">👤</span>${pendingAlertsCount ? `<span class="pulse-badge">${pendingAlertsCount}</span>` : ""}</div>`, iconSize: [35, 35], iconAnchor: [18, 18] });
+    default: baseIconUrl = "https://img.icons8.com/?size=100&id=hwOJ5x33ywg6&format=png&color=000000";
   }
-
   if (!pendingAlertsCount) return new L.Icon({ iconUrl: baseIconUrl, iconSize: [45, 45] });
-
-  return L.divIcon({
-    className: "solidaire-badge-icon",
-    html: `<div style="position: relative; display: inline-block;">
-            <img src="${baseIconUrl}" style="width:35px;height:35px;"/>
-            <span class="pulse-badge">${pendingAlertsCount}</span>
-           </div>`,
-    iconSize: [35, 35],
-    iconAnchor: [18, 18],
-  });
+  return L.divIcon({ className: "solidaire-badge-icon", html: `<div style="position: relative; display: inline-block;"><img src="${baseIconUrl}" style="width:35px;height:35px;"/><span class="pulse-badge">${pendingAlertsCount}</span></div>`, iconSize: [35, 35], iconAnchor: [18, 18] });
 };
 
-const alertHelper = (helper) => {
-  toast.info(`⚡ Alerte envoyée à ${helper.name}`);
-};
+const alertHelper = (helper) => { toast.info(`⚡ Alerte envoyée à ${helper.name}`); };
 
-// === Recentrage sur utilisateur ===
+// === Composants utilitaires ===
 function SetViewOnUser({ position }) {
   const map = useMap();
-  useEffect(() => {
-    if (position) map.setView(position, 15);
-  }, [position, map]);
+  useEffect(() => { if (position) map.setView(position, 15); }, [position, map]);
   return null;
 }
 
-// === Zoom sur alerte ===
 function FlyToLocation({ alert }) {
   const map = useMap();
   useEffect(() => {
@@ -87,62 +52,49 @@ function FlyToLocation({ alert }) {
   return null;
 }
 
-// === Composant principal MapView ===
-const MapView = forwardRef(({
-  reports = [],
-  solidaires = [],
-  alerts = [],
-  userPosition,
-  onReportClick,
-  onAlertUser,
-  activeReport,
-  selectedAlert,
-  cancelReport,
-  currentUserUid,
-  showHelperList,
-  setShowHelperList
-}, ref) => {
-  const mapRef = useRef(null);
+function HelperBanner({ activeReport, solidaires, userPosition }) {
+  if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
+  const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
+  if (!helper) return null;
+  const distance = helper.latitude && helper.longitude ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude) : null;
+  return (
+    <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", background: "#e6f7ff", border: "1px solid #91d5ff", padding: "8px 16px", borderRadius: "12px", zIndex: 1000, fontWeight: "bold", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      🚗 {helper.name} est en route pour vous aider
+      {distance && <span>📏 Distance restante : {distance.toFixed(1)} km</span>}
+    </div>
+  );
+}
 
-  useImperativeHandle(ref, () => ({
-    recenter: () => {
-      if (mapRef.current && userPosition) mapRef.current.setView(userPosition, 15);
-    },
-  }));
+// === Composant principal MapView ===
+const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPosition, onReportClick, onAlertUser, activeReport, selectedAlert, cancelReport, currentUserUid, showHelperList, setShowHelperList }, ref) => {
+  const mapRef = useRef(null);
+  useImperativeHandle(ref, () => ({ recenter: () => { if (mapRef.current && userPosition) mapRef.current.setView(userPosition, 15); } }));
 
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
-  const [isInProgressOpen, setIsInProgressOpen] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
   const [distanceToHelper, setDistanceToHelper] = useState(null);
   const [currentUser, setCurrentUser] = useState(solidaires.find(s => s.uid === currentUserUid) || null);
   const [paymentStatus, setPaymentStatus] = useState(null);
+  const filteredSolidairesWithCoords = findHelpers(solidaires, activeReport, alerts, currentUserUid).slice(0, 10);
+  const [reviewsMap, setReviewsMap] = useState({});
 
-  // Filter helpers avec coords valides
-  const filteredSolidairesWithCoords = findHelpers(solidaires, activeReport, alerts, currentUserUid);
-  const availableHelpers = filteredSolidairesWithCoords.slice(0, 10);
-
-  // Gestion des avis et notes
-  const [reviewsMap, setReviewsMap] = useState({}); // { [solidaireUid]: { averageNote: 4.5, count: 3 } }
+  // --- Fetch avis ---
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
-      await Promise.all(
-        filteredSolidairesWithCoords.map(async (s) => {
-          const q = query(collection(db, "reviews"), where("toUid", "==", s.uid));
-          const snap = await getDocs(q);
-          const avis = snap.docs.map(d => d.data());
-          const averageNote = avis.length > 0
-            ? avis.reduce((sum, r) => sum + r.note, 0) / avis.length
-            : 0;
-          map[s.uid] = { averageNote, count: avis.length };
-        })
-      );
+      await Promise.all(filteredSolidairesWithCoords.map(async (s) => {
+        const q = query(collection(db, "reviews"), where("toUid", "==", s.uid));
+        const snap = await getDocs(q);
+        const avis = snap.docs.map(d => d.data());
+        const averageNote = avis.length ? avis.reduce((sum, r) => sum + r.note, 0) / avis.length : 0;
+        map[s.uid] = { averageNote, count: avis.length };
+      }));
       setReviewsMap(map);
     };
     fetchReviews();
   }, [filteredSolidairesWithCoords]);
 
-  // Suivi temps réel du report actif
+  // --- Suivi temps réel du report actif ---
   useEffect(() => {
     if (!activeReport) return;
     const reportRef = doc(db, "reports", activeReport.id);
@@ -153,17 +105,14 @@ const MapView = forwardRef(({
         if (data.status !== activeReport.status || data.helperConfirmed !== activeReport.helperConfirmed) {
           onReportClick({ ...activeReport, status: data.status, helperUid: data.helperUid, helperConfirmed: data.helperConfirmed });
           if (data.helperConfirmed && !activeReport.helperConfirmed) toast.info(`🚗 ${data.helperName} est en route pour vous aider`);
-          if (data.helperConfirmed && data.status === "aide en cours") {
-            setCurrentReport({ ...activeReport, ...data });
-            setIsInProgressOpen(true);
-          }
+          if (data.helperConfirmed && data.status === "aide en cours") setCurrentReport({ ...activeReport, ...data });
         }
       }
     });
     return () => unsub();
   }, [activeReport, cancelReport, onReportClick]);
 
-  // Calcul distance en temps réel
+  // --- Calcul distance helper ---
   useEffect(() => {
     if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return;
     const interval = setInterval(() => {
@@ -175,7 +124,7 @@ const MapView = forwardRef(({
     return () => clearInterval(interval);
   }, [activeReport, solidaires, userPosition]);
 
-  // Toast pour notifications
+  // --- Notification sinistré ---
   useEffect(() => {
     if (!currentUserUid) return;
     const q = collection(db, "reports");
@@ -191,116 +140,70 @@ const MapView = forwardRef(({
     return () => unsub();
   }, [currentUserUid]);
 
-  if (!userPosition || userPosition.length < 2 || userPosition[0] == null || userPosition[1] == null)
-    return <div>📍 Localisation en cours...</div>;
+  if (!userPosition || userPosition.length < 2) return <div>📍 Localisation en cours...</div>;
 
   let alertLocation = null;
   if (selectedAlert) {
     const report = reports.find((r) => r.id === selectedAlert.reportId);
-    if (report && typeof report.latitude === "number" && typeof report.longitude === "number") {
-      alertLocation = { latitude: report.latitude, longitude: report.longitude };
-    }
+    if (report && typeof report.latitude === "number" && typeof report.longitude === "number") alertLocation = { latitude: report.latitude, longitude: report.longitude };
   }
 
-  function HelperBanner({ activeReport, solidaires, userPosition }) {
-    if (!activeReport || !activeReport.helperUid || !activeReport.helperConfirmed) return null;
-    const helper = solidaires.find((s) => s.uid === activeReport.helperUid);
-    if (!helper) return null;
-    const distance = helper.latitude && helper.longitude
-      ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
-      : null;
-    return (
-      <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", background: "#e6f7ff", border: "1px solid #91d5ff", padding: "8px 16px", borderRadius: "12px", zIndex: 1000, fontWeight: "bold", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        🚗 {helper.name} est en route pour vous aider
-        {distance && <span>📏 Distance restante : {distance} km</span>}
-      </div>
-    );
-  }
-
-  const canPay = activeReport?.helperConfirmed && activeReport?.status === "aide en cours" && activeReport?.frais > 0;
+  const isSinistre = currentUser?.role !== "solidaire";
 
   return (
     <>
+      {/* --- Modal Acceptation --- */}
       <AcceptModal
         isOpen={isAcceptOpen}
         onClose={() => setIsAcceptOpen(false)}
         alerte={currentReport}
-        onConfirm={(report) => { setCurrentReport(report); setIsAcceptOpen(false); setIsInProgressOpen(true); }}
+        onConfirm={(report) => { setCurrentReport(report); setIsAcceptOpen(false); }}
       />
-      <InProgressModal
-        isOpen={isInProgressOpen}
-        onClose={() => setIsInProgressOpen(false)}
-        report={currentReport}
-        solidaire={currentUser}
-        onComplete={() => {}}
-      />
+
+      {/* --- Modal côté sinistré --- */}
+      {isSinistre && currentReport?.helperConfirmed && (
+        <ActiveRepairModal
+          report={currentReport}
+          solidaire={filteredSolidairesWithCoords.find(s => s.uid === currentReport.helperUid)}
+          userPosition={userPosition}
+          onComplete={() => setCurrentReport(null)}
+        />
+      )}
+
+      {/* --- Modal côté solidaire --- */}
+      {!isSinistre && currentReport?.helperConfirmed && (
+        <InProgressModal
+          isOpen={true}
+          onClose={() => {}}
+          report={currentReport}
+          solidaire={currentUser}
+          userPosition={userPosition}
+          setPaymentStatus={setPaymentStatus}
+          onComplete={() => setCurrentReport(null)}
+        />
+      )}
+
+      {/* --- Modal liste helpers --- */}
       {showHelperList && (
         <ModalHelperList
-          helpers={availableHelpers}
+          helpers={filteredSolidairesWithCoords}
           userPosition={userPosition}
           activeReport={activeReport}
           onAlert={(helper) => { if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !"); alertHelper(helper); setShowHelperList(false); }}
           onClose={() => setShowHelperList(false)}
         />
       )}
-      <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%", zIndex: 0 }} ref={mapRef} scrollWheelZoom>
+
+      {/* --- Map --- */}
+      <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%" }} ref={mapRef} scrollWheelZoom>
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <SetViewOnUser position={userPosition} />
         {alertLocation && <FlyToLocation alert={alertLocation} />}
-        {activeReport?.helperConfirmed && activeReport.helperUid && (
-          <HelperBanner activeReport={activeReport} solidaires={filteredSolidairesWithCoords} userPosition={userPosition} />
-        )}
-        {activeReport?.helperConfirmed &&
-           activeReport.helperUid &&
-           activeReport.frais > 0 &&
-           currentUser && (
-            <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: "420px" }}>
-              <PaymentBanner
-                report={activeReport}
-                solidaire={
-                  filteredSolidairesWithCoords.find(s => s.uid === activeReport.helperUid) ||
-                  { uid: activeReport.helperUid, name: activeReport.helperName, stripeAccountId: activeReport.solidaireStripeId }
-                }
-                currentUser={currentUser}
-                isSinistre={currentUser.uid !== activeReport.helperUid}
-                paymentStatus={paymentStatus}
-                setPaymentStatus={setPaymentStatus}
-              />
+        {isSinistre && currentReport?.helperConfirmed && <HelperBanner activeReport={currentReport} solidaires={filteredSolidairesWithCoords} userPosition={userPosition} />}
 
-              {/* --- Progress Bar --- */}
-              <div className="mt-4 bg-white border border-gray-200 shadow-xl rounded-2xl p-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Paiement</span>
-                  <span>Intervention</span>
-                  <span>Terminé</span>
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${
-                      paymentStatus === null
-                        ? "w-1/4 bg-gray-400"
-                        : paymentStatus === "initiated"
-                        ? "w-1/2 bg-blue-500"
-                        : paymentStatus === "pending"
-                        ? "w-2/3 bg-yellow-500"
-                        : paymentStatus === "released"
-                        ? "w-full bg-green-600"
-                        : paymentStatus === "refunded"
-                        ? "w-full bg-red-500"
-                        : "w-0"
-                    }`}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          )}
+        <Marker position={userPosition} icon={currentUserIcon}><Popup>🙋‍♂️ Vous êtes ici</Popup></Marker>
 
-{/*        {canPay && <PayButton report={activeReport} />}*/}
-
-        <Marker position={userPosition} icon={currentUserIcon}>
-          <Popup>🙋‍♂️ Vous êtes ici</Popup>
-        </Marker>
-        {reports.map((report) => (
+        {reports.map(report => (
           <Marker key={report.id} position={[report.latitude, report.longitude]} icon={reportIcon} eventHandlers={{ click: () => onReportClick(report) }}>
             <Popup>
               <strong>⚠️ Panne :</strong> {report.nature} <br />
@@ -308,43 +211,32 @@ const MapView = forwardRef(({
             </Popup>
           </Marker>
         ))}
-        {filteredSolidairesWithCoords.map((s) => {
+
+        {filteredSolidairesWithCoords.map(s => {
           let status = "available";
           const isOffline = !s.online;
-          const alertForSolidaire = activeReport
-            ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
-            : null;
-
+          const alertForSolidaire = currentReport ? alerts.find(a => a.reportId === currentReport.id && a.toUid === s.uid) : null;
           if (isOffline) status = "offline";
-          else if (activeReport?.helperUid === s.uid) {
-            if (activeReport.helperConfirmed && activeReport.status === "aide en cours") status = "busy";
-            else if (!activeReport.helperConfirmed && alertForSolidaire) status = "alerted";
+          else if (currentReport?.helperUid === s.uid) {
+            if (currentReport.helperConfirmed && currentReport.status === "aide en cours") status = "busy";
+            else if (!currentReport.helperConfirmed && alertForSolidaire) status = "alerted";
           }
-
           const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
-          const alertCount = alerts.filter((a) => a.toUid === s.uid).length;
+          const alertCount = alerts.filter(a => a.toUid === s.uid).length;
 
           return (
             <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status, alertCount)}>
               <Popup>
                 <strong>👤 {s.name}</strong> <br />
-                <Typography>
-                  ⭐ Note moyenne : {reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} ({reviewsMap[s.uid]?.count || 0} avis)
-                </Typography>
-                <Typography>
-                  🏷 Rôle : {s.role ? s.role.replace(/_/g, " ") : "Non spécifié"}
-                </Typography>
+                {`⭐ Note moyenne : ${reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} (${reviewsMap[s.uid]?.count || 0} avis)`} <br />
+                Rôle : {s.role?.replace(/_/g, " ") || "Non spécifié"} <br />
                 Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"} <br />
-                📏 Distance : {distance} km <br />
+                📏 Distance : {distance.toFixed(1)} km <br />
                 {status === "available" && "✅ Disponible"}
                 {status === "offline" && "⚪ Indisponible"}
                 {status === "alerted" && "⏳ En attente de réponse"}
                 {status === "busy" && "⏳ Aide en cours"}
-                {status === "available" && s.uid !== currentUserUid && (
-                  <button onClick={() => { onAlertUser(s); toast.info(`⚡ Alerte envoyée à ${s.name}`); }}>
-                    ⚡ Alerter
-                  </button>
-                )}
+                {status === "available" && s.uid !== currentUserUid && <button onClick={() => { onAlertUser(s); toast.info(`⚡ Alerte envoyée à ${s.name}`); }}>⚡ Alerter</button>}
               </Popup>
             </Marker>
           );
