@@ -162,28 +162,30 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
   };
 
   console.log({currentUser, isSinistre, paymentStatus, solidaire})
+
   return (
-  {/* Solidaire doit créer un compte Stripe */}
-  {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
-    <div className="text-center">
-      <p className="text-gray-700">
-        ℹ️ Pour recevoir votre paiement, vous devez créer un compte Stripe.
-      </p>
-      <button
-        onClick={async () => {
-          const res = await fetch("http://localhost:4242/create-stripe-account", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uid: solidaire.uid, email: solidaire.email }),
-          });
-          const data = await res.json();
-          if (data.url) window.location.href = data.url;
-        }}
-        className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition"
-      >
-        🚀 Créer mon compte Stripe
-      </button>
-    </div>
+    <>
+    {/* Solidaire doit créer un compte Stripe */}
+    {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
+      <div className="text-center">
+        <p className="text-gray-700">
+          ℹ️ Pour recevoir votre paiement, vous devez créer un compte Stripe.
+        </p>
+        <button
+          onClick={async () => {
+            const res = await fetch("http://localhost:4242/create-stripe-account", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: solidaire.uid, email: solidaire.email }),
+            });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+          }}
+          className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition"
+        >
+          🚀 Créer mon compte Stripe
+        </button>
+      </div>
   ) : (
     <>
       {/* Titre */}
