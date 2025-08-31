@@ -4,7 +4,11 @@ import cors from "cors";
 import fs from "fs";
 import path from "path";
 import admin from "firebase-admin";
-import { createPaymentIntent, capturePaymentIntent, refundPaymentIntent } from "./stripeService.js";
+import {
+  createPaymentIntentWithCommission,
+  capturePayment,
+  refundPayment
+} from "./stripeService.js";
 
 // 🔑 Charger la clé Firebase
 const serviceAccount = JSON.parse(
@@ -29,14 +33,26 @@ app.use((req, res, next) => {
 });
 
 /**
- * 1️⃣ Créer un paiement (escrow)
+ * 1️⃣ Créer un paiement (escrow avec commission et transfert)
  */
 app.post("/create-payment", async (req, res) => {
-  const { reportId, amount } = req.body;
+  const { reportId, amount, solidaireStripeId } = req.body;
   try {
-    console.log(`➡️ Création PaymentIntent pour report ${reportId}, montant: ${amount}`);
-    const paymentIntent = await createPaymentIntent(amount);
+    if (!solidaireStripeId) throw new Error("solidaireStripeId manquant");
 
+    console.log(
+      `➡️ Création PaymentIntent pour report ${reportId}, montant: ${amount}, solidaire: ${solidaireStripeId}`
+    );
+
+    // ⚡ création du PaymentIntent avec commission (20% ici)
+    const paymentIntent = await createPaymentIntentWithCommission(
+      Math.round(amount * 100), // montant en centimes
+      "eur",
+      solidaireStripeId,
+      20
+    );
+
+    // Sauvegarde en Firestore
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "created",
       status: "séquestre confirmé",
@@ -60,7 +76,7 @@ app.post("/release-payment", async (req, res) => {
   const { reportId, paymentIntentId } = req.body;
   try {
     console.log(`➡️ Capture PaymentIntent ${paymentIntentId}`);
-    const paymentIntent = await capturePaymentIntent(paymentIntentId);
+    const paymentIntent = await capturePayment(paymentIntentId);
 
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "released",
@@ -81,7 +97,7 @@ app.post("/refund-payment", async (req, res) => {
   const { reportId, paymentIntentId } = req.body;
   try {
     console.log(`➡️ Refund PaymentIntent ${paymentIntentId}`);
-    const refund = await refundPaymentIntent(paymentIntentId);
+    const refund = await refundPayment(paymentIntentId);
 
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "refunded",

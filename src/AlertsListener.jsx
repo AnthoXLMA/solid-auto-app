@@ -1,3 +1,4 @@
+// src/AlertsListener.jsx
 import React, { useEffect, useState } from "react";
 import {
   collection,
@@ -15,7 +16,7 @@ import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
-import { createEscrow, releaseEscrow } from "./services/escrowService";
+// import { createEscrow, releaseEscrow } from "../backend/escrowService";
 import HelpBanner from "./HelpBanner";
 
 export default function AlertsListener({ user, setSelectedAlert }) {
@@ -76,71 +77,68 @@ export default function AlertsListener({ user, setSelectedAlert }) {
   };
 
   const rejectAlert = async (alerte) => {
-  if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
-  if (alerte.status === "accepté" || alerte.status === "refusé") return;
+    if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
+    if (alerte.status === "accepté" || alerte.status === "refusé") return;
 
-  try {
-    const reportRef = doc(db, "reports", alerte.reportId);
-    const reportSnap = await getDoc(reportRef);
-    if (reportSnap.exists()) {
-      await updateDoc(reportRef, {
-        status: "aide refusée",
-        notificationForOwner: `❌ Le solidaire a refusé votre demande de dépannage.`
-      });
-    }
+    try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+      if (reportSnap.exists()) {
+        await updateDoc(reportRef, {
+          status: "aide refusée",
+          notificationForOwner: `❌ Le solidaire a refusé votre demande de dépannage.`
+        });
+      }
 
-    await deleteDoc(doc(db, "alertes", alerte.id));
-    removeAlertWithAnimation(alerte.id);
-
-    await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
-    await updateUserStatus(user.uid, "disponible", true, null);
-
-    toast.info("❌ Alerte rejetée !");
-  } catch (err) {
-    console.error("Erreur rejet :", err);
-    toast.error("❌ Une erreur est survenue lors du rejet.");
-  }
-};
-
-
-  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
-  if (!alerte?.reportId) return;
-
-  try {
-    const reportRef = doc(db, "reports", alerte.reportId);
-    const reportSnap = await getDoc(reportRef);
-    if (!reportSnap.exists()) {
       await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
-      setAcceptModal({ isOpen: false, alerte: null });
-      toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
-      return;
+
+      await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
+      await updateUserStatus(user.uid, "disponible", true, null);
+
+      toast.info("❌ Alerte rejetée !");
+    } catch (err) {
+      console.error("Erreur rejet :", err);
+      toast.error("❌ Une erreur est survenue lors du rejet.");
     }
+  };
 
-    const reportData = reportSnap.data();
-    const finalAmount = fraisAnnules ? 0 : montant;
+  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
+    if (!alerte?.reportId) return;
 
-    // 🔑 Mettre à jour report côté backend, mais ne pas ouvrir InProgressModal
-    await updateDoc(reportRef, {
-      status: "attente séquestre",
-      helperUid: user.uid,
-      helperConfirmed: true,
-      frais: finalAmount,
-      notificationForOwner: `🚨 Solidaire en route ! Montant : ${finalAmount} €`,
-      escrowStatus: null // On attend le sinistré
-    });
+    try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+      if (!reportSnap.exists()) {
+        await deleteDoc(doc(db, "alertes", alerte.id));
+        removeAlertWithAnimation(alerte.id);
+        setAcceptModal({ isOpen: false, alerte: null });
+        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+        return;
+      }
 
-    await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
+      const finalAmount = fraisAnnules ? 0 : montant;
 
-    // ✅ Informer le solidaire / UI
-    setAcceptModal({ isOpen: false, alerte: null });
-    toast.info("Le sinistré doit maintenant bloquer le montant via PaymentBanner.");
-  } catch (err) {
-    console.error("Erreur confirmation frais :", err);
-    toast.error("❌ Erreur lors de la validation des frais.");
-  }
-};
+      // 🔑 Mettre à jour report côté backend
+      await updateDoc(reportRef, {
+        status: "attente séquestre",
+        helperUid: user.uid,
+        helperConfirmed: true,
+        frais: finalAmount,
+        notificationForOwner: `🚨 Solidaire en route ! Montant : ${finalAmount} €`,
+        escrowStatus: null
+      });
 
+      await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
+
+      // ✅ Informer le solidaire
+      setAcceptModal({ isOpen: false, alerte: null });
+      toast.info("Le sinistré doit maintenant bloquer le montant via PaymentBanner.");
+    } catch (err) {
+      console.error("Erreur confirmation frais :", err);
+      toast.error("❌ Erreur lors de la validation des frais.");
+    }
+  };
 
   // 🔔 Écoute reports pour InProgressModal
   useEffect(() => {
@@ -151,14 +149,12 @@ export default function AlertsListener({ user, setSelectedAlert }) {
       snapshot.docs.forEach((docSnap) => {
         const report = { id: docSnap.id, ...docSnap.data() };
 
-        // Montant séquestré via Stripe
         if ((report.escrowStatus === "created" || report.frais === 0) && !inProgressModal.isOpen) {
           setAcceptModal({ isOpen: false, alerte: null });
           setInProgressModal({ isOpen: true, report });
           toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
         }
 
-        // Alerte rejetée
         if (report.status === "aide refusée" && report.alertId) {
           removeAlertWithAnimation(report.alertId);
         }
@@ -168,8 +164,9 @@ export default function AlertsListener({ user, setSelectedAlert }) {
     return () => unsub();
   }, [user, inProgressModal.isOpen]);
 
+  // ⛔️ plus d’appel direct à releaseEscrow ici
   const handleReleasePayment = async (reportId) => {
-    await releaseEscrow(reportId, setPaymentStatus);
+    toast.info("ℹ️ Libération du paiement gérée par InProgressModal");
     setInProgressModal({ isOpen: false, report: null });
   };
 
