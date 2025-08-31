@@ -367,11 +367,11 @@ export default function App() {
           />
         )}
 
-        {canPay && (
+       {/* {canPay && (
           <div className="fixed bottom-24 left-4 right-4 bg-white rounded-xl shadow-lg p-4 z-40">
             <PayButton report={activeReport} />
           </div>
-        )}
+        )}*/}
       </main>
 
       {/* Menu flottant */}
