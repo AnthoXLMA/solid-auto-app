@@ -18,7 +18,7 @@ function HelpBanner({ report, onComplete }) {
   const [distance, setDistance] = useState(null);
 
   useEffect(() => {
-    if (!report || report.latitude == null || report.longitude == null) return;
+    if (!report?.latitude || !report?.longitude) return;
 
     const interval = setInterval(() => {
       if (navigator.geolocation) {
@@ -37,7 +37,7 @@ function HelpBanner({ report, onComplete }) {
     return () => clearInterval(interval);
   }, [report]);
 
-  if (!report) return null;
+  if (!report) return null; // NE PAS RENDER si report nul
 
   return (
     <div
@@ -71,7 +71,7 @@ function HelpBanner({ report, onComplete }) {
           padding: "4px 8px",
           cursor: "pointer",
         }}
-        onClick={() => onComplete && onComplete()}
+        onClick={() => onComplete?.()}
       >
         ✅ Intervention terminée
       </button>
