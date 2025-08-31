@@ -1,6 +1,5 @@
 // src/components/InProgressModal.jsx
 import React, { useState, useEffect } from "react";
-import { releaseEscrow } from "./services/escrowService";
 import { toast } from "react-toastify";
 import { getDistanceKm } from "./utils/distance";
 
@@ -11,7 +10,7 @@ export default function InProgressModal({
   solidaire,
   setPaymentStatus,
   onComplete,
-  userPosition, // Ajouter pour calcul distance
+  userPosition,
 }) {
   const [loading, setLoading] = useState(false);
   const [arrived, setArrived] = useState(false);
@@ -65,11 +64,21 @@ export default function InProgressModal({
       setLoading(true);
       setPaymentStatus?.("releasing");
 
-      const idToRelease = report.paymentIntentId || report.id;
-      const result = await releaseEscrow(idToRelease, setPaymentStatus);
+      // ⚡ Appel direct au backend
+      const response = await fetch("http://localhost:4242/release-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportId: report.id,
+          paymentIntentId: report.paymentIntentId, // important pour Stripe
+        }),
+      });
+
+      const result = await response.json();
 
       if (result.success) {
         toast.success("💸 Paiement libéré !");
+        setPaymentStatus?.("released");
       } else {
         toast.error(`❌ Erreur libération paiement : ${result.error}`);
       }
