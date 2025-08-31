@@ -89,36 +89,36 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
 
   const isSolidaire = currentUser.uid === solidaire.uid;
 
-  // Création du PaymentIntent
-  const handleCreateEscrow = async () => {
-    if (!solidaire?.stripeAccountId) {
-      toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
-      return;
-    }
 
-    try {
-      const response = await fetch("http://localhost:4242/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: report.id,
-          amount: report.frais,
-          solidaireStripeId: solidaire.stripeAccountId,
-        }),
-      });
-      const data = await response.json();
+    // Création du PaymentIntent
+    const handleCreateEscrow = async () => {
+        if (!solidaire?.stripeAccountId) {
+          toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
+          return;
+        }
+      try {
+        const response = await fetch("http://localhost:4242/create-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reportId: report.id,
+            amount: report.frais,
+            solidaireStripeId: solidaire.stripeAccountId || null, // ✅ null si pas encore onboardé
+          }),
+        });
+        const data = await response.json();
 
-      if (data.clientSecret) {
-        setClientSecret(data.clientSecret);
-        setPaymentStatus("initiated");
-      } else {
-        toast.error("❌ Impossible de créer le séquestre");
+        if (data.clientSecret) {
+          setClientSecret(data.clientSecret);
+          setPaymentStatus("initiated");
+        } else {
+          toast.error("❌ Impossible de créer le séquestre");
+        }
+      } catch (err) {
+        console.error("Erreur createEscrow frontend:", err);
+        toast.error("❌ Erreur côté client");
       }
-    } catch (err) {
-      console.error("Erreur createEscrow frontend:", err);
-      toast.error("❌ Erreur côté client");
-    }
-  };
+    };
 
   // Libération et remboursement inchangés
   const handleReleaseEscrow = async () => {

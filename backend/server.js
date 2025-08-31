@@ -97,7 +97,7 @@ app.post("/create-payment", async (req, res) => {
     const paymentIntent = await createPaymentIntentWithCommission(
       Math.round(amount * 100),
       "eur",
-      solidaireStripeId,
+      solidaireStripeId || undefined, // ✅ ne force pas
       20
     );
 
