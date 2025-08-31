@@ -112,7 +112,7 @@ export default function InProgressModal({
               report={report}
               solidaire={solidaire}
               currentUser={userPosition?.uid ? { uid: userPosition.uid } : { uid: "sinistre" }} // adapte selon ton contexte
-              isSinistre={true} // ici on sait que le currentUser est le sinistré
+              isSinistre={false} // ici on sait que le currentUser est le sinistré
             />
           )}
         <div className="flex gap-2 mt-4">
