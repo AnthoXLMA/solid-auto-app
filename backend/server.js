@@ -1,3 +1,4 @@
+// backend/server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -6,8 +7,8 @@ import path from "path";
 import admin from "firebase-admin";
 import {
   createPaymentIntentWithCommission,
-  capturePayment,
-  refundPayment
+  capturePayment,  // aliasé correctement
+  refundPayment    // aliasé correctement
 } from "./stripeService.js";
 
 // 🔑 Charger la clé Firebase
@@ -91,7 +92,7 @@ app.post("/release-payment", async (req, res) => {
 });
 
 /**
- * 3️⃣ Rembourser (refund)
+ * 3️⃣ Rembourser un paiement (refund)
  */
 app.post("/refund-payment", async (req, res) => {
   const { reportId, paymentIntentId } = req.body;
