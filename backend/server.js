@@ -1,4 +1,3 @@
-// backend/server.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -7,8 +6,8 @@ import path from "path";
 import admin from "firebase-admin";
 import {
   createPaymentIntentWithCommission,
-  capturePayment,  // aliasé correctement
-  refundPayment    // aliasé correctement
+  capturePayment,
+  refundPayment
 } from "./stripeService.js";
 
 // 🔑 Charger la clé Firebase
@@ -41,19 +40,15 @@ app.post("/create-payment", async (req, res) => {
   try {
     if (!solidaireStripeId) throw new Error("solidaireStripeId manquant");
 
-    console.log(
-      `➡️ Création PaymentIntent pour report ${reportId}, montant: ${amount}, solidaire: ${solidaireStripeId}`
-    );
+    console.log(`➡️ Création PaymentIntent pour report ${reportId}, montant: ${amount}, solidaire: ${solidaireStripeId}`);
 
-    // ⚡ création du PaymentIntent avec commission (20% ici)
     const paymentIntent = await createPaymentIntentWithCommission(
-      Math.round(amount * 100), // montant en centimes
+      Math.round(amount * 100),
       "eur",
       solidaireStripeId,
       20
     );
 
-    // Sauvegarde en Firestore
     await admin.firestore().collection("reports").doc(reportId).update({
       escrowStatus: "created",
       status: "séquestre confirmé",
