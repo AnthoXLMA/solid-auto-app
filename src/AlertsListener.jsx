@@ -7,7 +7,6 @@ import {
   doc,
   updateDoc,
   deleteDoc,
-  addDoc,
   getDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -17,12 +16,11 @@ import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
 import HelpBanner from "./HelpBanner";
 
-export default function AlertsListener({ user, setSelectedAlert, userPosition }) {
+export default function AlertsListener({ user, setSelectedAlert, userPosition, inline }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
-  const [paymentStatus, setPaymentStatus] = useState(null);
 
   // 🔥 Marquer le solidaire en ligne
   useEffect(() => {
@@ -65,7 +63,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       await updateDoc(doc(db, "solidaires", user.uid), { status: "aide en cours" });
-
       setAcceptModal({ isOpen: true, alerte });
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
@@ -90,7 +87,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
 
       await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
-
       await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
       await updateUserStatus(user.uid, "disponible", true, null);
 
@@ -139,7 +135,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
   // 🔔 Écoute reports pour InProgressModal
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       snapshot.docs.forEach((docSnap) => {
@@ -173,69 +168,74 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
     }
   };
 
-  return (
+  // ✅ Rendu sécurisé : si inline, ne pas mettre de div fixe
+  const content = (
+    <>
+      <AcceptModal
+        isOpen={acceptModal.isOpen}
+        onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+        alerte={acceptModal.alerte}
+        onConfirm={handleConfirmPricing}
+      />
+
+      <InProgressModal
+        isOpen={inProgressModal.isOpen}
+        onClose={() => setInProgressModal({ isOpen: false, report: null })}
+        report={inProgressModal.report}
+        solidaire={user}
+        onComplete={handleReleasePayment}
+      />
+
+      <HelpBanner
+        report={inProgressModal.report}
+        onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
+      />
+
+      {alerts.length === 0 ? (
+        <p>Aucune alerte pour l’instant</p>
+      ) : (
+        <ul className="space-y-3">
+          {alerts.map((a) => (
+            <li key={a.id} className="p-3 rounded-lg shadow-sm" style={{ backgroundColor: statusColor(a.status) }}>
+              <h5 className="font-medium">
+                🚨 {a.ownerName || a.fromUid || "Inconnu"} a signalé : {a.nature || "Panne"}
+              </h5>
+              <p>📍 À {a.distance ?? "?"} km de vous</p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                  onClick={() => setSelectedAlert(a)}
+                >
+                  📍 Voir sur la carte
+                </button>
+                <button
+                  className="px-2 py-1 rounded text-white"
+                  style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
+                  onClick={() => acceptAlert(a)}
+                  disabled={a.status === "accepté" || a.status === "refusé"}
+                >
+                  ✅ Accepter
+                </button>
+                <button
+                  className="px-2 py-1 rounded text-white"
+                  style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
+                  onClick={() => rejectAlert(a)}
+                  disabled={a.status === "accepté" || a.status === "refusé"}
+                >
+                  ❌ Refuser
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
+  return inline ? content : (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
-        <h4 className="mb-4 font-semibold text-lg">📢 Mes alertes reçues</h4>
-
-        <AcceptModal
-          isOpen={acceptModal.isOpen}
-          onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
-          alerte={acceptModal.alerte}
-          onConfirm={handleConfirmPricing}
-        />
-
-        <InProgressModal
-          isOpen={inProgressModal.isOpen}
-          onClose={() => setInProgressModal({ isOpen: false, report: null })}
-          report={inProgressModal.report}
-          solidaire={user}
-          onComplete={handleReleasePayment}
-        />
-
-        <HelpBanner
-          report={inProgressModal.report}
-          onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
-        />
-
-        {alerts.length === 0 ? (
-          <p>Aucune alerte pour l’instant</p>
-        ) : (
-          <ul className="space-y-3">
-            {alerts.map((a) => (
-              <li key={a.id} className="p-3 rounded-lg shadow-sm" style={{ backgroundColor: statusColor(a.status) }}>
-                <h5 className="font-medium">
-                  🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}
-                </h5>
-                <p>📍 À {a.distance || "?"} km de vous</p>
-                <div className="flex gap-2 mt-2">
-                  <button
-                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                    onClick={() => setSelectedAlert(a)}
-                  >
-                    📍 Voir sur la carte
-                  </button>
-                  <button
-                    className="px-2 py-1 rounded text-white"
-                    style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
-                    onClick={() => acceptAlert(a)}
-                    disabled={a.status === "accepté" || a.status === "refusé"}
-                  >
-                    ✅ Accepter
-                  </button>
-                  <button
-                    className="px-2 py-1 rounded text-white"
-                    style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
-                    onClick={() => rejectAlert(a)}
-                    disabled={a.status === "accepté" || a.status === "refusé"}
-                  >
-                    ❌ Refuser
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        {content}
       </div>
     </div>
   );
