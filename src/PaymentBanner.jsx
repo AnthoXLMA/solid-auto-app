@@ -95,6 +95,7 @@ export default function PaymentBanner({ report, solidaire }) {
   // 1️⃣ Création du PaymentIntent
   const handleCreateEscrow = async () => {
     try {
+      console.log("💳 Solidaire pour paiement :", solidaire);
       const response = await fetch("http://localhost:4242/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
