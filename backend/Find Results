@@ -1,0 +1,10 @@
+Searching 87 files for "setDistance(dist.toFixed(1));"
+
+/Users/anthony/code/AnthoXLMA/solid-auto-app-backup/src/ActiveRepairModal.jsx:
+   58        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   59        const dist = R * c;
+   60:       setDistance(Number(dist.toFixed(1)));
+   61      };
+   62
+
+1 match in 1 file

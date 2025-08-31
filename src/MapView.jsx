@@ -221,7 +221,7 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
             if (currentReport.helperConfirmed && currentReport.status === "aide en cours") status = "busy";
             else if (!currentReport.helperConfirmed && alertForSolidaire) status = "alerted";
           }
-          const distance = getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude);
+          const distance = Number(getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude));
           const alertCount = alerts.filter(a => a.toUid === s.uid).length;
 
           return (
@@ -231,7 +231,7 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
                 {`⭐ Note moyenne : ${reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} (${reviewsMap[s.uid]?.count || 0} avis)`} <br />
                 Rôle : {s.role?.replace(/_/g, " ") || "Non spécifié"} <br />
                 Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"} <br />
-                📏 Distance : {distance.toFixed(1)} km <br />
+                📏 Distance : {distance.toFixed(1)} km
                 {status === "available" && "✅ Disponible"}
                 {status === "offline" && "⚪ Indisponible"}
                 {status === "alerted" && "⏳ En attente de réponse"}
