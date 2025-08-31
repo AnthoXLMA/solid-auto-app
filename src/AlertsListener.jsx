@@ -168,7 +168,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }
   };
 
-  // ✅ Rendu sécurisé : si inline, ne pas mettre de div fixe
   const content = (
     <>
       <AcceptModal
@@ -187,7 +186,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       />
 
       <HelpBanner
-        report={inProgressModal.report}
+        report={inProgressModal.report || null} // Sécurisé
         onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
       />
 
