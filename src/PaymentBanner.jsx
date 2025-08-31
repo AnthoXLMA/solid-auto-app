@@ -172,11 +172,15 @@ export default function PaymentBanner({ report, solidaire, currentUser }) {
   return (
     <div className="fixed top-5 left-1/2 -translate-x-1/2 w-[400px] bg-white border border-gray-200 shadow-lg rounded-2xl p-5 z-[9999] pointer-events-auto">
       {/* Affiche création de compte Stripe seulement pour le solidaire */}
-      {isSolidaire && !solidaire.stripeAccountId ? (
+      {!solidaire?.stripeAccountId || !solidaire?.uid || !solidaire?.email ? (
         <div className="text-center p-4">
           ℹ️ Vous devez créer un compte Stripe pour recevoir le paiement.
           <button
             onClick={async () => {
+              if (!solidaire?.uid || !solidaire?.email) {
+                toast.error("❌ Données utilisateur manquantes !");
+                return;
+              }
               const res = await fetch("http://localhost:4242/create-stripe-account", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
