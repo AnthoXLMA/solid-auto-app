@@ -1,4 +1,3 @@
-// src/AlertsListener.jsx
 import React, { useEffect, useState } from "react";
 import {
   collection,
@@ -16,7 +15,6 @@ import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
-// import { createEscrow, releaseEscrow } from "../backend/escrowService";
 import HelpBanner from "./HelpBanner";
 
 export default function AlertsListener({ user, setSelectedAlert, userPosition }) {
@@ -119,7 +117,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
 
       const finalAmount = fraisAnnules ? 0 : montant;
 
-      // 🔑 Mettre à jour report côté backend
       await updateDoc(reportRef, {
         status: "attente séquestre",
         helperUid: user.uid,
@@ -131,7 +128,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
 
       await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
 
-      // ✅ Informer le solidaire
       setAcceptModal({ isOpen: false, alerte: null });
       toast.info("Le sinistré doit maintenant bloquer le montant via PaymentBanner.");
     } catch (err) {
@@ -164,7 +160,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition })
     return () => unsub();
   }, [user, inProgressModal.isOpen]);
 
-  // ⛔️ plus d’appel direct à releaseEscrow ici
   const handleReleasePayment = async (reportId) => {
     toast.info("ℹ️ Libération du paiement gérée par InProgressModal");
     setInProgressModal({ isOpen: false, report: null });
