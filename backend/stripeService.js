@@ -38,29 +38,41 @@ export async function refundPayment(paymentIntentId) {
 }
 
 /**
- * 🔹 Créer un séquestre avec commission plateforme et transfert direct au solidaire
+ * 🔹 Créer un séquestre avec commission plateforme (optionnel) et transfert au solidaire si dispo
  * @param {number} amount Montant total (en centimes)
  * @param {string} currency Devise (ex: "eur")
- * @param {string} solidaireStripeId Compte Stripe Connect du solidaire
+ * @param {string|null} solidaireStripeId Compte Stripe Connect du solidaire (peut être null)
  * @param {number} commissionPourcentage Pourcentage de commission pour la plateforme
  */
 export async function createPaymentIntentWithCommission(
   amount,
   currency = "eur",
-  solidaireStripeId,
-  commissionPourcentage
+  solidaireStripeId = null,
+  commissionPourcentage = 0
 ) {
   if (!amount || amount <= 0) throw new Error("Montant invalide");
-  if (!solidaireStripeId) throw new Error("Compte Stripe Connect du solidaire manquant");
 
-  const applicationFeeAmount = Math.round((amount * commissionPourcentage) / 100);
+  // Commission calculée seulement si nécessaire
+  const applicationFeeAmount =
+    commissionPourcentage > 0 ? Math.round((amount * commissionPourcentage) / 100) : 0;
 
+  // Cas 1 : solidaire a un compte Stripe -> transfert direct
+  if (solidaireStripeId) {
+    return await stripe.paymentIntents.create({
+      amount,
+      currency,
+      capture_method: "manual",
+      payment_method_types: ["card"],
+      transfer_data: { destination: solidaireStripeId },
+      application_fee_amount: applicationFeeAmount,
+    });
+  }
+
+  // Cas 2 : pas de compte Stripe -> fonds bloqués sur le compte plateforme
   return await stripe.paymentIntents.create({
     amount,
     currency,
     capture_method: "manual",
     payment_method_types: ["card"],
-    transfer_data: { destination: solidaireStripeId },
-    application_fee_amount: applicationFeeAmount,
   });
 }
