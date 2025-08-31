@@ -1,12 +1,48 @@
-// src/ActiveRepairModal.jsx
 import React, { useEffect, useState } from "react";
-import { releaseEscrow, refundEscrow } from "./backend/escrowService";
 
 export default function ActiveRepairModal({ report, solidaire, userPosition, onComplete }) {
   const [distance, setDistance] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState(report.paymentStatus || null);
 
-  // Calcul distance en temps réel (Haversine)
+  // Fonction pour libérer le paiement via le backend
+  const handleRelease = async () => {
+    try {
+      const res = await fetch("http://localhost:4242/release-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPaymentStatus("released");
+        onComplete(report.id);
+      } else {
+        alert(data.error || "Erreur lors de la libération du paiement");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau lors de la libération du paiement");
+    }
+  };
+
+  // Fonction pour rembourser via le backend
+  const handleRefund = async () => {
+    try {
+      const res = await fetch("http://localhost:4242/refund-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
+      });
+      const data = await res.json();
+      if (data.success) setPaymentStatus("refunded");
+      else alert(data.error || "Erreur lors du remboursement");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau lors du remboursement");
+    }
+  };
+
+  // Calcul distance en temps réel
   useEffect(() => {
     if (!report.latitude || !report.longitude || !userPosition) return;
 
@@ -21,11 +57,11 @@ export default function ActiveRepairModal({ report, solidaire, userPosition, onC
           Math.sin(dLon / 2) ** 2;
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const dist = R * c;
-      setDistance(dist.toFixed(1));
+      setDistance(Number(dist.toFixed(1)));
     };
 
     calculateDistance();
-    const interval = setInterval(calculateDistance, 5000); // mise à jour toutes les 5 sec
+    const interval = setInterval(calculateDistance, 5000);
     return () => clearInterval(interval);
   }, [report.latitude, report.longitude, userPosition]);
 
@@ -40,8 +76,7 @@ export default function ActiveRepairModal({ report, solidaire, userPosition, onC
         <p>💰 Montant : {report.frais} €</p>
         <p>🛠 Nature : {report.nature}</p>
         <p>📍 Adresse : {report.address}</p>
-        {distance && <p>⏳ Distance restante : {distance} km</p>}
-
+        {distance !== null && <p>⏳ Distance restante : {distance} km</p>}
         {/* Paiement */}
         {paymentStatus === null && (
           <button
@@ -59,10 +94,7 @@ export default function ActiveRepairModal({ report, solidaire, userPosition, onC
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             className="bg-green-500 text-white px-4 py-2 rounded flex-1"
-            onClick={() => {
-              releaseEscrow(report.id, setPaymentStatus);
-              onComplete(report.id);
-            }}
+            onClick={handleRelease}
           >
             Terminé
           </button>
@@ -83,7 +115,7 @@ export default function ActiveRepairModal({ report, solidaire, userPosition, onC
 
           <button
             className="bg-red-500 text-white px-4 py-2 rounded flex-1"
-            onClick={() => refundEscrow(report.id, setPaymentStatus)}
+            onClick={handleRefund}
           >
             Annuler / Rembourser
           </button>
