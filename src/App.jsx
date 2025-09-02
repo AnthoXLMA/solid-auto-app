@@ -87,15 +87,29 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // -------------------- Geolocalisation --------------------
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCurrentPosition([pos.coords.latitude, pos.coords.longitude]),
-        () => setCurrentPosition([46.959095, 4.858485]) // Beaune
-      );
-    }
-  }, []);
+  // -------------------- Géolocalisation --------------------
+useEffect(() => {
+  if (!navigator.geolocation) {
+    toast.warning("⚠️ Géolocalisation non supportée par votre navigateur.");
+    setCurrentPosition([46.959095, 4.858485]); // fallback Beaune
+    return;
+  }
+
+  const watcher = navigator.geolocation.watchPosition(
+    (pos) => {
+      setCurrentPosition([pos.coords.latitude, pos.coords.longitude]);
+    },
+    (err) => {
+      console.warn("Erreur géoloc :", err.message);
+      toast.warning("⚠️ Impossible de récupérer votre position. Position par défaut utilisée.");
+      setCurrentPosition([46.959095, 4.858485]); // fallback Beaune
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+
+  return () => navigator.geolocation.clearWatch(watcher);
+}, []);
+
 
   // -------------------- Fake users --------------------
   useEffect(() => {
@@ -351,6 +365,7 @@ export default function App() {
         {showReportForm && (
           <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
             <ReportForm
+              user={user} // <- important
               userPosition={currentPosition}
               onNewReport={(r) => { handleNewReport(r); setShowReportForm(false); }}
               onClose={() => setShowReportForm(false)}
@@ -374,99 +389,95 @@ export default function App() {
         )}*/}
       </main>
 
-      {/* Menu flottant */}
-<div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-between items-center z-50">
+{/* Menu flottant */}
+<div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-center items-center z-50">
+  {/* Conteneur flex pour les icônes avec espacement uniforme */}
+  <div className="flex justify-between items-center w-full max-w-lg px-6">
 
-  {/* Gauche : Dashboard / Carte */}
-  <div className="flex items-center space-x-4 ml-4">
-    {/* Nombre de reports */}
-    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-      ⚡ {reports.length}
-    </span>
-
-    {/* Dashboard */}
-    <button
-      onClick={() => setPage("dashboard")}
-      className="flex flex-col items-center justify-center"
-    >
-      <FaTachometerAlt size={24} />
-      <span className="text-xs mt-1">Dashboard</span>
-    </button>
-
-    {/* Carte */}
-    <button
-      onClick={() => {
-        if (page !== "map") {
-          setPage("map");
-        } else {
-          mapRef.current?.recenter?.();
-        }
-      }}
-      className="flex flex-col items-center justify-center"
-    >
-      <FaMapMarkedAlt size={24} />
-      <span className="text-xs mt-1">Carte</span>
-    </button>
-  </div>
-
-  {/* Centre : bouton + pour signaler une panne */}
-  <div className="absolute left-1/2 transform -translate-x-1/2 -top-10 z-50">
-    <button
-      onClick={() => setShowReportForm(true)}
-      className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
-    >
-      +
-    </button>
-  </div>
-
-  {/* Droite : Chat / Feed / Solidaire en ligne */}
-  <div className="flex items-center space-x-4 mr-4">
-    {/* Chat */}
-    <button
-      onClick={() => {
-        if (activeReport?.helperConfirmed) {
-          navigateTo("chat");
-        } else {
-          toast.info("💬 Vous pouvez initier une nouvelle panne ou contacter un solidaire en cliquant ici.");
-        }
-      }}
-      className="flex flex-col items-center relative"
-    >
-      <FaCommentDots size={24} />
-      <span className="text-xs mt-1">Chat</span>
-      {unreadMessages > 0 && activeReport?.helperConfirmed && (
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
-          {unreadMessages}
-        </span>
-      )}
-    </button>
-
-    {/* Feed / alerts */}
-    <button
-      onClick={() => setShowAlertHistory(true)}
-      className="flex flex-col items-center relative"
-    >
-      <FaBook size={24} />
-      <span className="text-xs mt-1">Feed</span>
-      {alerts.length > 0 && (
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center justify-center animate-pulse">
-          {alerts.length}
-        </span>
-      )}
-    </button>
-
-    {/* Solidaire en ligne */}
-    <button
-      onClick={() => setShowHelperList(true)}
-      className="flex flex-col items-center relative"
-    >
-      👥
-      <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-        {onlineUsers}
+    {/* Gauche : Dashboard / Carte + compteur de reports */}
+    <div className="flex items-center space-x-6">
+      {/* Nombre de pannes/reports */}
+      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+        ⚡ {reports.length}
       </span>
-    </button>
+
+      {/* Dashboard */}
+      <button
+        onClick={() => setPage("dashboard")}
+        className="flex flex-col items-center justify-center"
+      >
+        <FaTachometerAlt size={24} />
+        <span className="text-xs mt-1">Dashboard</span>
+      </button>
+
+      {/* Carte */}
+      <button
+        onClick={() => {
+          if (page !== "map") setPage("map");
+          else mapRef.current?.recenter?.();
+        }}
+        className="flex flex-col items-center justify-center"
+      >
+        <FaMapMarkedAlt size={24} />
+        <span className="text-xs mt-1">Carte</span>
+      </button>
+    </div>
+
+    {/* Centre : bouton + */}
+    <div className="relative -top-8">
+      <button
+        onClick={() => setShowReportForm(true)}
+        className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
+      >
+        +
+      </button>
+    </div>
+
+    {/* Droite : Chat / Feed / Utilisateurs en ligne */}
+    <div className="flex items-center space-x-6">
+      {/* Chat */}
+      <button
+        onClick={() => {
+          if (activeReport?.helperConfirmed) navigateTo("chat");
+          else toast.info("💬 Initiez une panne ou contactez un solidaire !");
+        }}
+        className="flex flex-col items-center justify-center relative"
+      >
+        <FaCommentDots size={24} />
+        <span className="text-xs mt-1">Chat</span>
+        {unreadMessages > 0 && activeReport?.helperConfirmed && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1 rounded-full">
+            {unreadMessages}
+          </span>
+        )}
+      </button>
+
+      {/* Feed / Alerts */}
+      <button
+        onClick={() => setShowAlertHistory(true)}
+        className="flex flex-col items-center justify-center relative"
+      >
+        <FaBook size={24} />
+        <span className="text-xs mt-1">Feed</span>
+        {alerts.length > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-2 py-1 rounded-full flex items-center justify-center animate-pulse">
+            {alerts.length}
+          </span>
+        )}
+      </button>
+
+      {/* Utilisateurs en ligne */}
+      <div className="flex flex-col items-center justify-center relative">
+        👥
+        <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+          {onlineUsers}
+        </span>
+        <span className="text-xs mt-1">En ligne</span>
+      </div>
+    </div>
   </div>
 </div>
+
 
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
