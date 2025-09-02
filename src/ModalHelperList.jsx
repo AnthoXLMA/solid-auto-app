@@ -84,10 +84,11 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
         environment: activeReport.environment || "",
         needsTow: activeReport.needsTow || false,
         message: activeReport.message || "",
-        timestamp: new Date(), // timestamp local
+        timestamp: new Date(),
         status: "en attente"
       });
     }
+
 
     toast.success(`⚡ Alerte envoyée à ${helper.name}`);
     onClose();
