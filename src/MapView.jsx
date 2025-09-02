@@ -234,6 +234,15 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
               </Marker>
             );
           })}
+          {isSinistre && currentReport?.helperConfirmed && (
+            <PaymentBanner
+              report={currentReport}
+              solidaire={solidaires.find(s => s.uid === currentReport.helperUid)}
+              currentUser={{ uid: currentUserUid }}
+              isSinistre={true}
+            />
+          )}
+
         </MapContainer>
       </div>
     </>
