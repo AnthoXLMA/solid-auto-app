@@ -50,32 +50,35 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
   };
 
   const handleAlert = async (helper) => {
-    if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
+  if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
-    try {
-      await addDoc(collection(db, "alertes"), {
-        reportId: activeReport.id,
-        toUid: helper.uid,
-        fromUid: activeReport.ownerUid || "sinistre",
-        ownerName: activeReport.ownerName || "Sinistré",
-        nature: activeReport.nature || "Panne",
-        subType: activeReport.subType || "",
-        incident: activeReport.incident || "",
-        date: activeReport.date || "",
-        time: activeReport.time || "",
-        environment: activeReport.environment || "",
-        needsTow: activeReport.needsTow || false,
-        message: activeReport.message || "",
-        timestamp: serverTimestamp(),
-        status: "en attente"
-      });
-      toast.success(`⚡ Alerte envoyée à ${helper.name}`);
-      onClose();
-    } catch (err) {
-      console.error("Erreur lors de l’envoi de l’alerte :", err);
-      toast.error("❌ Impossible d’envoyer l’alerte");
-    }
-  };
+  try {
+    const docRef = await addDoc(collection(db, "alertes"), {
+      reportId: activeReport.id,
+      toUid: helper.uid,              // s'assurer que c'est bien l'UID du solidaire
+      fromUid: activeReport.ownerUid || "sinistré",
+      ownerName: activeReport.ownerName || "Sinistré",
+      nature: activeReport.nature || "Panne",
+      subType: activeReport.subType || "",
+      incident: activeReport.incident || "",
+      environment: activeReport.environment || "",
+      needsTow: activeReport.needsTow || false,
+      message: activeReport.message || "",
+      timestamp: serverTimestamp(),
+      status: "en attente"
+    });
+
+    console.log("Alerte créée", docRef.id, "pour solidaire:", helper.uid);
+
+    toast.success(`⚡ Alerte envoyée à ${helper.name}`);
+    onClose();
+
+  } catch (err) {
+    console.error("Erreur lors de l’envoi de l’alerte :", err);
+    toast.error("❌ Impossible d’envoyer l’alerte");
+  }
+};
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
