@@ -1,15 +1,20 @@
+// src/ReportForm.jsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
-import { ChevronLeft, ChevronRight } from "lucide-react"; // icônes flèches
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "./firebase";
+import { toast } from "react-toastify";
 
-export default function ReportForm({ userPosition, onNewReport, onClose }) {
+export default function ReportForm({ userPosition, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const carouselRef = useRef(null);
   const startX = useRef(0);
   const [cardWidth, setCardWidth] = useState(0);
 
-  // Calcul largeur d’une carte (inclut margin)
+  // --- Calcul largeur d’une carte (inclut margin)
   useEffect(() => {
     const firstCard = carouselRef.current?.querySelector(".carousel-card");
     if (firstCard) {
@@ -19,40 +24,57 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
     }
   }, []);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!userPosition) return;
+  // --- Création d’un nouveau report dans Firestore
+  const onNewReport = async (reportData) => {
+    if (!userPosition) {
+      toast.error("Position utilisateur inconnue !");
+      return;
+    }
 
-    onNewReport({
-      latitude: userPosition[0],
-      longitude: userPosition[1],
-      nature,
-      message,
-      status: "en-attente",
-      address: "Adresse inconnue",
-    });
+    setLoading(true);
+    try {
+      const docRef = await addDoc(collection(db, "reports"), {
+        latitude: reportData.latitude,
+        longitude: reportData.longitude,
+        nature: reportData.nature,
+        message: reportData.message || "",
+        status: "en-attente",
+        timestamp: serverTimestamp(),
+        ownerUid: reportData.ownerUid || null, // uid du sinistré
+        ownerName: reportData.ownerName || null,
+        address: reportData.address || "Adresse inconnue",
+        helperUid: null,
+        helperConfirmed: false,
+        frais: 0,
+        paymentIntentId: null,
+        escrowStatus: null,
+      });
 
-    setMessage("");
+      toast.success("🚨 Report créé !");
+      onClose();
+      return docRef.id;
+    } catch (err) {
+      console.error("Erreur création report :", err);
+      toast.error("❌ Impossible de créer le report");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Navigation
+  // --- Navigation carousel
   const currentIndex = PANNE_TYPES.findIndex((p) => p.value === nature);
-
   const slideNext = useCallback(() => {
     const nextIndex = (currentIndex + 1) % PANNE_TYPES.length;
     setNature(PANNE_TYPES[nextIndex].value);
   }, [currentIndex]);
-
   const slidePrev = useCallback(() => {
     const prevIndex = (currentIndex - 1 + PANNE_TYPES.length) % PANNE_TYPES.length;
     setNature(PANNE_TYPES[prevIndex].value);
   }, [currentIndex]);
 
-  // Swipe mobile
   const onTouchStart = useCallback((e) => {
     startX.current = e.touches[0].clientX;
   }, []);
-
   const onTouchEnd = useCallback(
     (e) => {
       const diff = e.changedTouches[0].clientX - startX.current;
@@ -65,15 +87,27 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
   useEffect(() => {
     const carousel = carouselRef.current;
     if (!carousel) return;
-
     carousel.addEventListener("touchstart", onTouchStart, { passive: true });
     carousel.addEventListener("touchend", onTouchEnd);
-
     return () => {
       carousel.removeEventListener("touchstart", onTouchStart);
       carousel.removeEventListener("touchend", onTouchEnd);
     };
   }, [onTouchStart, onTouchEnd]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!userPosition) return toast.error("Position inconnue !");
+    await onNewReport({
+      latitude: userPosition[0],
+      longitude: userPosition[1],
+      nature,
+      message,
+      ownerUid: userPosition.uid, // si tu stockes l'UID du sinistré ici
+      ownerName: userPosition.name || null,
+      address: "Adresse inconnue",
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-end bg-black/50 p-4">
@@ -82,13 +116,10 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
                    max-h-[90vh] animate-fade-in"
         style={{ marginBottom: "120px" }}
       >
-        <h3 className="text-center text-xl font-bold p-4 border-b">
-          Signaler une panne
-        </h3>
+        <h3 className="text-center text-xl font-bold p-4 border-b">Signaler une panne</h3>
 
-        {/* Carousel avec flèches */}
+        {/* Carousel */}
         <div className="relative p-4">
-          {/* Flèche gauche */}
           <button
             type="button"
             onClick={slidePrev}
@@ -97,14 +128,11 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
             <ChevronLeft size={20} />
           </button>
 
-          {/* Container */}
           <div className="overflow-hidden">
             <div
               ref={carouselRef}
               className="flex transition-transform duration-300"
-              style={{
-                transform: `translateX(-${currentIndex * cardWidth}px)`,
-              }}
+              style={{ transform: `translateX(-${currentIndex * cardWidth}px)` }}
             >
               {PANNE_TYPES.map((p) => (
                 <div
@@ -123,7 +151,6 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
             </div>
           </div>
 
-          {/* Flèche droite */}
           <button
             type="button"
             onClick={slideNext}
@@ -136,7 +163,7 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
         {/* Contenu scrollable */}
         <div className="px-4 flex-1 overflow-y-auto">
           <textarea
-            placeholder="De quoi avez vous besoin?"
+            placeholder="De quoi avez-vous besoin ?"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             className="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 mb-4"
@@ -144,7 +171,7 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
           />
         </div>
 
-        {/* Footer avec boutons */}
+        {/* Footer */}
         <div className="flex gap-3 p-4 border-t">
           <button
             type="button"
@@ -156,9 +183,10 @@ export default function ReportForm({ userPosition, onNewReport, onClose }) {
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={loading}
             className="flex-1 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
           >
-            Envoyer
+            {loading ? "⏳ Envoi..." : "Envoyer"}
           </button>
         </div>
       </div>

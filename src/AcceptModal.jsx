@@ -1,23 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { calculateFees } from "./utils/calculateFees";
 
-/**
- * AcceptModal
- *
- * Props :
- * - isOpen : boolean, si le modal doit s'afficher
- * - onClose : function, ferme le modal
- * - alerte : objet report/alerte sur lequel agir
- * - onConfirm : function, appelée lors de la confirmation du montant
- * - onStartRepair : function optionnelle, lance le modal InProgress pour le solidaire
- */
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
   const distanceKm = alerte?.distance || 0;
   const fraisCalculés = calculateFees(distanceKm);
-
   const [montant, setMontant] = useState(fraisCalculés);
 
-  // 🔄 Recalculer montant si alerte change
   useEffect(() => {
     setMontant(fraisCalculés);
   }, [fraisCalculés]);
@@ -25,12 +13,16 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
   if (!isOpen || !alerte) return null;
 
   const handleConfirm = (fraisAnnules) => {
-    // 1️⃣ Mettre à jour le paiement / frais côté backend
-    onConfirm(alerte, fraisAnnules ? 0 : montant, fraisAnnules);
-    // 2️⃣ Fermer le modal actuel
+    const frais = fraisAnnules ? 0 : montant;
+
+    // Mettre à jour le report côté frontend pour déclencher PaymentBanner / InProgressModal
+    const updatedReport = { ...alerte, frais, helperConfirmed: true };
+
+    // ⚡ Côté parent : update report et éventuellement lancer modal solidaire
+    onConfirm(updatedReport, frais);
+
     onClose();
-    // 3️⃣ Lancer le modal solidaire en cours si fourni
-    if (onStartRepair) onStartRepair(alerte);
+    if (onStartRepair) onStartRepair(updatedReport);
   };
 
   return (
@@ -38,7 +30,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in">
         <h2 className="text-lg font-bold mb-4">Confirmer le dépannage</h2>
         <p className="mb-4 text-sm text-gray-700">
-          Souhaitez-vous <strong>conserver</strong> les frais de la course ({fraisCalculés} € estimés)
+          Souhaitez-vous <strong>conserver</strong> les frais ({fraisCalculés} € estimés)
           ou les <strong>annuler</strong> ?
         </p>
 

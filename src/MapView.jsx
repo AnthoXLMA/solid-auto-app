@@ -175,21 +175,46 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
 
   const isSinistre = currentUser?.role !== "solidaire";
 
+  console.log("PaymentBanner props:", currentReport, solidaires.find(s => s.uid === currentReport.helperUid), currentUserUid);
   return (
     <>
+
       {/* --- Modals et banners au-dessus --- */}
       <AcceptModal isOpen={isAcceptOpen} onClose={() => setIsAcceptOpen(false)} alerte={currentReport} onConfirm={(report) => { setCurrentReport(report); setIsAcceptOpen(false); }} />
-      {isSinistre && currentReport?.helperConfirmed && <ActiveRepairModal report={currentReport} solidaire={filteredSolidairesWithCoords.find(s => s.uid === currentReport.helperUid)} userPosition={userPosition} onComplete={() => setCurrentReport(null)} />}
-      {!isSinistre && currentReport?.helperConfirmed && <InProgressModal isOpen={true} onClose={() => {}} report={currentReport} solidaire={currentUser} userPosition={userPosition} setPaymentStatus={setPaymentStatus} onComplete={() => setCurrentReport(null)} />}
-      {showHelperList && <ModalHelperList helpers={filteredSolidairesWithCoords} userPosition={userPosition} activeReport={activeReport} onAlert={(helper) => { if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !"); alertHelper(helper); setShowHelperList(false); }} onClose={() => setShowHelperList(false)} />}
-      {isSinistre && currentReport?.helperConfirmed && (
-            <PaymentBanner
-              report={currentReport}
-              solidaire={solidaires.find(s => s.uid === currentReport.helperUid)}
-              currentUser={{ uid: currentUserUid }}
-              isSinistre={true}
-            />
-          )}
+      {isSinistre && currentReport?.helperConfirmed && currentReport.helperUid && (
+        <ActiveRepairModal
+          report={currentReport}
+          solidaire={filteredSolidairesWithCoords.find(s => s.uid === currentReport.helperUid) || null}
+          userPosition={userPosition}
+          onComplete={() => setCurrentReport(null)}
+        />
+      )}
+      {!isSinistre && currentReport?.helperConfirmed &&
+        <InProgressModal
+          isOpen={true}
+          onClose={() => {}}
+          report={currentReport}
+          solidaire={currentUser}
+          userPosition={userPosition}
+          setPaymentStatus={setPaymentStatus}
+          onComplete={() => setCurrentReport(null)}
+        />}
+      {showHelperList &&
+        <ModalHelperList
+          helpers={filteredSolidairesWithCoords}
+          userPosition={userPosition}
+          activeReport={activeReport}
+          onAlert={(helper) => { if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !"); alertHelper(helper); setShowHelperList(false); }}
+          onClose={() => setShowHelperList(false)}
+        />}
+        {isSinistre && currentReport?.helperConfirmed && currentReport.helperUid && (
+          <PaymentBanner
+            report={currentReport}
+            solidaire={solidaires.find(s => s.uid === currentReport.helperUid) || null}
+            currentUser={{ uid: currentUserUid }}
+            isSinistre={true}
+          />
+        )}
       {/* --- Map en arrière-plan --- */}
       <div className="relative w-full h-full z-0">
         <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%" }} ref={mapRef} scrollWheelZoom>
