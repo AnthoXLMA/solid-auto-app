@@ -25,7 +25,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔥 Marquer le solidaire en ligne
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     const userRef = doc(db, "solidaires", user.uid);
     updateDoc(userRef, { status: "disponible" }).catch(console.error);
     return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
@@ -33,7 +33,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔔 Écoute des alertes
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       const sorted = snapshot.docs
@@ -64,7 +64,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-      await updateDoc(doc(db, "solidaires", user.uid), { status: "aide en cours" });
+      if (user?.uid) await updateDoc(doc(db, "solidaires", user.uid), { status: "aide en cours" });
       setAcceptModal({ isOpen: true, alerte });
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
@@ -92,8 +92,10 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
       await deleteDoc(doc(db, "alertes", alerte.id));
       removeAlertWithAnimation(alerte.id);
-      await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
-      await updateUserStatus(user.uid, "disponible", true, null);
+      if (user?.uid) {
+        await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
+        await updateUserStatus(user.uid, "disponible", true, null);
+      }
 
       toast.info("❌ Alerte rejetée !");
     } catch (err) {
@@ -104,7 +106,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔹 Confirmation des frais depuis AcceptModal
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
-    if (!alerte?.reportId) return;
+    if (!alerte?.reportId || !user?.uid) return;
 
     try {
       const reportRef = doc(db, "reports", alerte.reportId);
@@ -139,11 +141,13 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔔 Écoute des reports pour InProgressModal
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       snapshot.docs.forEach((docSnap) => {
         const report = { id: docSnap.id, ...docSnap.data() };
+
+        if (!report) return;
 
         // Si paiement bloqué ou frais 0, ouvrir InProgressModal
         if ((report.escrowStatus === "created" || report.frais === 0) && !inProgressModal.isOpen) {
@@ -202,7 +206,11 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       ) : (
         <ul className="space-y-3">
           {alerts.map((a) => (
-            <li key={a.id} className="p-3 rounded-lg shadow-sm" style={{ backgroundColor: statusColor(a.status) }}>
+            <li
+              key={a.id}
+              className="p-3 rounded-lg shadow-sm"
+              style={{ backgroundColor: statusColor(a.status) }}
+            >
               <h5 className="font-medium">
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} a signalé : {a.nature || "Panne"}
               </h5>
