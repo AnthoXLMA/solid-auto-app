@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp } from "fire
 import { db } from "./firebase";
 import { toast } from "react-toastify";
 
-export default function ModalHelperList({ helpers, onClose, userPosition, activeReport }) {
+export default function ModalHelperList({ helpers, onClose, userPosition, activeReport, onNewAlert }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({}); // { [uid]: { averageNote: 4.5, count: 3 } }
 
@@ -55,7 +55,7 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
   try {
     const docRef = await addDoc(collection(db, "alertes"), {
       reportId: activeReport.id,
-      toUid: helper.uid,              // s'assurer que c'est bien l'UID du solidaire
+      toUid: helper.uid,
       fromUid: activeReport.ownerUid || "sinistré",
       ownerName: activeReport.ownerName || "Sinistré",
       nature: activeReport.nature || "Panne",
@@ -70,6 +70,25 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
 
     console.log("Alerte créée", docRef.id, "pour solidaire:", helper.uid);
 
+    // ⚡ Ajouter l’alerte localement
+    if (onNewAlert) {
+      onNewAlert({
+        id: docRef.id,
+        reportId: activeReport.id,
+        toUid: helper.uid,
+        fromUid: activeReport.ownerUid || "sinistré",
+        ownerName: activeReport.ownerName || "Sinistré",
+        nature: activeReport.nature || "Panne",
+        subType: activeReport.subType || "",
+        incident: activeReport.incident || "",
+        environment: activeReport.environment || "",
+        needsTow: activeReport.needsTow || false,
+        message: activeReport.message || "",
+        timestamp: new Date(), // timestamp local
+        status: "en attente"
+      });
+    }
+
     toast.success(`⚡ Alerte envoyée à ${helper.name}`);
     onClose();
 
@@ -78,6 +97,7 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
     toast.error("❌ Impossible d’envoyer l’alerte");
   }
 };
+
 
 
   return (

@@ -388,6 +388,7 @@ const handleNewReport = async (newReport) => {
             user={user}
             setSelectedAlert={setSelectedAlert}
             userPosition={currentPosition}
+            onNewAlert={(alerte) => setAlerts(prev => [alerte, ...prev])} // <-- nouveau
           />
         )}
 

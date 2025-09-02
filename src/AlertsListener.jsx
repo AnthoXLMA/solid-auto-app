@@ -20,7 +20,7 @@ import HelpBanner from "./HelpBanner";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
 
-export default function AlertsListener({ user, setSelectedAlert, userPosition, inline }) {
+export default function AlertsListener({ user, setSelectedAlert, userPosition, inline, onNewAlert }) {
   const [alerts, setAlerts] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
@@ -78,6 +78,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       toast.error("❌ Une erreur est survenue lors de l’acceptation.");
     }
   };
+  console.log("👤 Solidaire connecté:", user.uid);
 
   // 🔹 Rejeter une alerte (solidaire)
   const rejectAlert = async (alerte) => {
