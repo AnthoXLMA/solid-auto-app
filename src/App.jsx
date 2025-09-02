@@ -202,24 +202,33 @@ useEffect(() => {
   };
 
   // -------------------- Report creation --------------------
-  const handleNewReport = async (newReport) => {
-    if (!user) return;
-    try {
-      const docRef = await addDoc(collection(db, "reports"), {
-        ...newReport,
-        ownerUid: user.uid,
-        helperUid: null,
-        notified: false,
-        status: "en attente",
-        timestamp: serverTimestamp(),
-      });
-      setActiveReport({ ...newReport, id: docRef.id });
-      toast.success("✅ Demande de panne créée !");
-    } catch (err) {
-      console.error("Erreur création report :", err);
-      toast.error("⚠️ Impossible de créer le rapport.");
-    }
-  };
+const handleNewReport = async (newReport) => {
+  if (!user) return;
+  try {
+    // créer report dans Firestore (comme tu le faisais)
+    const docRef = await addDoc(collection(db, "reports"), {
+      ...newReport,
+      ownerUid: user.uid,
+      helperUid: null,
+      notified: false,
+      status: "en attente",
+      timestamp: serverTimestamp(),
+    });
+
+    // setActiveReport avec l'id (important)
+    const created = { ...newReport, id: docRef.id };
+    setActiveReport(created);
+
+    // OUVRIR la modal helper list automatiquement pour proposer des helpers
+    setShowHelperList(true);
+
+    toast.success("✅ Demande de panne créée !");
+  } catch (err) {
+    console.error("Erreur création report :", err);
+    toast.error("⚠️ Impossible de créer le rapport.");
+  }
+};
+
 
   // -------------------- Helper filtering --------------------
   const filteredSolidaires = solidaires

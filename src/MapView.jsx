@@ -164,6 +164,7 @@ const MapView = forwardRef(
     ).slice(0, 10);
 
     const [reviewsMap, setReviewsMap] = useState({});
+    const [showInProgress, setShowInProgress] = useState(false);
 
     // --- Fetch avis ---
     useEffect(() => {
@@ -187,33 +188,33 @@ const MapView = forwardRef(
 
     // --- Suivi temps réel du report actif ---
     useEffect(() => {
-      if (!activeReport) return;
-      const reportRef = doc(db, "reports", activeReport.id);
-      const unsub = onSnapshot(reportRef, (docSnap) => {
-        if (!docSnap.exists()) cancelReport(activeReport.id);
-        else {
-          const data = docSnap.data();
-          if (
-            data.status !== activeReport.status ||
-            data.helperConfirmed !== activeReport.helperConfirmed
-          ) {
-            onReportClick({
-              ...activeReport,
-              status: data.status,
-              helperUid: data.helperUid || null,
-              helperConfirmed: data.helperConfirmed || false,
-            });
+  if (!activeReport) return;
+  const reportRef = doc(db, "reports", activeReport.id);
+  const unsub = onSnapshot(reportRef, (docSnap) => {
+    if (!docSnap.exists()) return cancelReport(activeReport.id);
+    const data = docSnap.data();
 
-            if (data.helperConfirmed && !activeReport.helperConfirmed && data.helperName)
-              toast.info(`🚗 ${data.helperName} est en route pour vous aider`);
+    // Met à jour currentReport pour affichage général
+    setCurrentReport({ ...activeReport, ...data });
 
-            if (data.helperConfirmed && data.status === "aide en cours")
-              setCurrentReport({ ...activeReport, ...data });
-          }
-        }
-      });
-      return () => unsub();
-    }, [activeReport, cancelReport, onReportClick]);
+    // 🔹 Ouvre InProgressModal côté solidaire
+    if (
+      data.status === "attente séquestre" &&
+      data.helperConfirmed &&
+      !showInProgress
+    ) {
+      setShowInProgress(true);
+    }
+
+    // Notification pour le sinistré
+    if (data.notificationForOwner) {
+      toast.info(data.notificationForOwner);
+      updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+    }
+  });
+  return () => unsub();
+}, [activeReport, cancelReport, showInProgress]);
+
 
     // --- Calcul distance helper ---
     useEffect(() => {
@@ -283,10 +284,10 @@ const MapView = forwardRef(
             onComplete={() => setCurrentReport(null)}
           />
         )}
-        {!isSinistre && currentReport?.helperConfirmed && (
+        {!isSinistre && showInProgress && currentReport && (
           <InProgressModal
             isOpen={true}
-            onClose={() => {}}
+            onClose={() => setShowInProgress(false)}
             report={currentReport}
             solidaire={currentUser}
             userPosition={userPosition}

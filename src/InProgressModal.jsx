@@ -16,6 +16,7 @@ export default function InProgressModal({
   const [arrived, setArrived] = useState(false);
   const [distance, setDistance] = useState(null);
 
+
   useEffect(() => {
     if (!isOpen || !userPosition || !report) return;
     const interval = setInterval(() => {
