@@ -182,7 +182,14 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
       {isSinistre && currentReport?.helperConfirmed && <ActiveRepairModal report={currentReport} solidaire={filteredSolidairesWithCoords.find(s => s.uid === currentReport.helperUid)} userPosition={userPosition} onComplete={() => setCurrentReport(null)} />}
       {!isSinistre && currentReport?.helperConfirmed && <InProgressModal isOpen={true} onClose={() => {}} report={currentReport} solidaire={currentUser} userPosition={userPosition} setPaymentStatus={setPaymentStatus} onComplete={() => setCurrentReport(null)} />}
       {showHelperList && <ModalHelperList helpers={filteredSolidairesWithCoords} userPosition={userPosition} activeReport={activeReport} onAlert={(helper) => { if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !"); alertHelper(helper); setShowHelperList(false); }} onClose={() => setShowHelperList(false)} />}
-
+      {isSinistre && currentReport?.helperConfirmed && (
+            <PaymentBanner
+              report={currentReport}
+              solidaire={solidaires.find(s => s.uid === currentReport.helperUid)}
+              currentUser={{ uid: currentUserUid }}
+              isSinistre={true}
+            />
+          )}
       {/* --- Map en arrière-plan --- */}
       <div className="relative w-full h-full z-0">
         <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%" }} ref={mapRef} scrollWheelZoom>
@@ -234,15 +241,6 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
               </Marker>
             );
           })}
-          {isSinistre && currentReport?.helperConfirmed && (
-            <PaymentBanner
-              report={currentReport}
-              solidaire={solidaires.find(s => s.uid === currentReport.helperUid)}
-              currentUser={{ uid: currentUserUid }}
-              isSinistre={true}
-            />
-          )}
-
         </MapContainer>
       </div>
     </>
