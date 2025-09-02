@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { getDistanceKm } from "./utils/distance";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
+import { toast } from "react-toastify";
 
-export default function ModalHelperList({ helpers, onClose, userPosition, onAlert, activeReport }) {
+export default function ModalHelperList({ helpers, onClose, userPosition, activeReport }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({}); // { [uid]: { averageNote: 4.5, count: 3 } }
 
-  // ✅ Filtrer les helpers pour ne garder que ceux avec coords valides
+  // Filtrer les helpers avec coords valides
   const validHelpers = helpers.filter(
     (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
-  // ✅ Récupérer les avis pour chaque helper
+  // Récupérer les avis
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -50,6 +51,28 @@ export default function ModalHelperList({ helpers, onClose, userPosition, onAler
     setCurrentIndex((prev) => (prev === validHelpers.length - 1 ? 0 : prev + 1));
   };
 
+  // ⚡ Crée une alerte Firestore pour le solidaire
+  const handleAlert = async (helper) => {
+    if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !");
+
+    try {
+      await addDoc(collection(db, "alertes"), {
+        reportId: activeReport.id,
+        toUid: helper.uid,
+        fromUid: activeReport.ownerUid || "sinistre",
+        ownerName: activeReport.ownerName || "Sinistré",
+        nature: activeReport.nature || "Panne",
+        timestamp: serverTimestamp(),
+        status: "en attente"
+      });
+      toast.success(`⚡ Alerte envoyée à ${helper.name}`);
+      onClose();
+    } catch (err) {
+      console.error("Erreur lors de l’envoi de l’alerte :", err);
+      toast.error("❌ Impossible d’envoyer l’alerte");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 overflow-hidden relative">
@@ -62,26 +85,22 @@ export default function ModalHelperList({ helpers, onClose, userPosition, onAler
                           h-[280px] w-full max-w-xs overflow-y-auto">
             <div className="font-medium text-lg text-center">{currentHelper.name}</div>
 
-            {/* Rôle */}
             <div className="text-sm text-gray-500 text-center mt-1">
               🏷 Rôle : {currentHelper.role ? currentHelper.role.replace(/_/g, " ") : "Non spécifié"}
             </div>
 
-            {/* Note moyenne + nb avis */}
             <div className="text-sm text-gray-500 text-center mt-1">
               ⭐ Note : {reviewsMap[currentHelper.uid]?.averageNote?.toFixed(1) || "N/A"} ({reviewsMap[currentHelper.uid]?.count || 0} avis)
             </div>
 
-            {/* Matériel */}
             <div className="text-sm text-gray-500 text-center mt-2">
               Matériel : {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
             </div>
 
-            {/* Distance */}
             <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance} km</div>
 
             <button
-              onClick={() => onAlert(currentHelper)}
+              onClick={() => handleAlert(currentHelper)}
               className="mt-auto bg-blue-600 text-white px-3 py-1 rounded-lg"
               disabled={!activeReport}
               title={!activeReport ? "Vous devez avoir un signalement actif" : ""}
