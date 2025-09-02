@@ -388,60 +388,46 @@ useEffect(() => {
           </div>
         )}*/}
       </main>
+{/* Menu flottant responsive */}
+<div className="fixed bottom-0 left-0 w-full bg-white shadow-t z-50">
+  <div className="relative flex justify-between items-center px-4 py-3 max-w-screen-lg mx-auto">
 
-{/* Menu flottant */}
-<div className="fixed bottom-0 left-0 w-full bg-white shadow-t py-4 flex justify-center items-center z-50">
-  {/* Conteneur flex pour les icônes avec espacement uniforme */}
-  <div className="flex justify-between items-center w-full max-w-lg px-6">
-
-    {/* Gauche : Dashboard / Carte + compteur de reports */}
-    <div className="flex items-center space-x-6">
+    {/* Gauche : Dashboard / Carte avec compteur de reports */}
+    <div className="flex items-center space-x-4">
       {/* Nombre de pannes/reports */}
       <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
         ⚡ {reports.length}
       </span>
 
-      {/* Dashboard */}
       <button
         onClick={() => setPage("dashboard")}
-        className="flex flex-col items-center justify-center"
+        className="flex flex-col items-center justify-center text-center"
       >
         <FaTachometerAlt size={24} />
         <span className="text-xs mt-1">Dashboard</span>
       </button>
 
-      {/* Carte */}
       <button
         onClick={() => {
           if (page !== "map") setPage("map");
           else mapRef.current?.recenter?.();
         }}
-        className="flex flex-col items-center justify-center"
+        className="flex flex-col items-center justify-center text-center"
       >
         <FaMapMarkedAlt size={24} />
         <span className="text-xs mt-1">Carte</span>
       </button>
     </div>
 
-    {/* Centre : bouton + */}
-    <div className="relative -top-8">
-      <button
-        onClick={() => setShowReportForm(true)}
-        className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
-      >
-        +
-      </button>
-    </div>
-
     {/* Droite : Chat / Feed / Utilisateurs en ligne */}
-    <div className="flex items-center space-x-6">
+    <div className="flex items-center space-x-4">
       {/* Chat */}
       <button
         onClick={() => {
           if (activeReport?.helperConfirmed) navigateTo("chat");
           else toast.info("💬 Initiez une panne ou contactez un solidaire !");
         }}
-        className="flex flex-col items-center justify-center relative"
+        className="flex flex-col items-center justify-center relative text-center"
       >
         <FaCommentDots size={24} />
         <span className="text-xs mt-1">Chat</span>
@@ -455,7 +441,7 @@ useEffect(() => {
       {/* Feed / Alerts */}
       <button
         onClick={() => setShowAlertHistory(true)}
-        className="flex flex-col items-center justify-center relative"
+        className="flex flex-col items-center justify-center relative text-center"
       >
         <FaBook size={24} />
         <span className="text-xs mt-1">Feed</span>
@@ -467,7 +453,7 @@ useEffect(() => {
       </button>
 
       {/* Utilisateurs en ligne */}
-      <div className="flex flex-col items-center justify-center relative">
+      <div className="flex flex-col items-center justify-center relative text-center">
         👥
         <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
           {onlineUsers}
@@ -478,6 +464,15 @@ useEffect(() => {
   </div>
 </div>
 
+{/* Bouton + flottant en bas à droite */}
+<div className="fixed bottom-20 right-4 z-50">
+  <button
+    onClick={() => setShowReportForm(true)}
+    className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
+  >
+    +
+  </button>
+</div>
 
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
