@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { doc, updateDoc } from "firebase/firestore";
@@ -14,11 +14,15 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
   const [loading, setLoading] = useState(false);
 
   const handlePay = async () => {
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || loading) return;
+
     setLoading(true);
     try {
+      const card = elements.getElement(CardElement);
+      if (!card) throw new Error("Element Card non trouvé");
+
       const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: { card: elements.getElement(CardElement) },
+        payment_method: { card },
       });
 
       if (result.error) {
@@ -29,15 +33,17 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
         if (pi.status === "requires_capture" || pi.status === "succeeded") {
           setStatus("✅ Paiement validé !");
           onPaymentSuccess("pending");
+
           const reportRef = doc(db, "reports", report.id);
           await updateDoc(reportRef, { escrowStatus: "created" });
-          toast.success(`💰 Paiement validé ! ${report.helperName} peut intervenir.`);
+          toast.success(`💰 Paiement bloqué ! ${report.helperName || "Le solidaire"} peut intervenir.`);
         } else {
           setStatus("⚠️ Paiement non bloqué");
           onPaymentSuccess(null);
         }
       }
     } catch (err) {
+      console.error(err);
       setStatus("❌ Erreur : " + err.message);
       onPaymentSuccess(null);
     } finally {
@@ -99,7 +105,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
   };
 
   const handleReleaseEscrow = async () => {
-    if (!report?.paymentIntentId) return;
+    if (!report?.paymentIntentId || paymentStatus !== "pending") return;
     try {
       const response = await fetch("http://localhost:4242/release-payment", {
         method: "POST",
@@ -133,7 +139,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
   };
 
   return (
-    <>
+    <div className="p-3 border rounded-lg bg-gray-50 mt-4">
       {!solidaire?.stripeAccountId && isSolidaire ? (
         <div className="text-center">
           <p className="text-gray-700">ℹ️ Pour recevoir votre paiement, créez un compte Stripe.</p>
@@ -202,6 +208,6 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
           )}
         </>
       )}
-    </>
+    </div>
   );
 }

@@ -17,7 +17,6 @@ import { updateUserStatus } from "./userService";
 import HelpBanner from "./HelpBanner";
 import PaymentBanner from "./PaymentBanner";
 
-
 export default function AlertsListener({ user, setSelectedAlert, userPosition, inline }) {
   const [alerts, setAlerts] = useState([]);
   const [removingIds, setRemovingIds] = useState([]);
@@ -58,6 +57,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }, 300);
   };
 
+  // 🔹 Accepter une alerte
   const acceptAlert = async (alerte) => {
     if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
     if (alerte.status === "accepté" || alerte.status === "refusé") return;
@@ -73,18 +73,21 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }
   };
 
+  // 🔹 Rejeter une alerte
   const rejectAlert = async (alerte) => {
     if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
     if (alerte.status === "accepté" || alerte.status === "refusé") return;
 
     try {
-      const reportRef = doc(db, "reports", alerte.reportId);
-      const reportSnap = await getDoc(reportRef);
-      if (reportSnap.exists()) {
-        await updateDoc(reportRef, {
-          status: "aide refusée",
-          notificationForOwner: `❌ Le solidaire a refusé votre demande de dépannage.`
-        });
+      if (alerte.reportId) {
+        const reportRef = doc(db, "reports", alerte.reportId);
+        const reportSnap = await getDoc(reportRef);
+        if (reportSnap.exists()) {
+          await updateDoc(reportRef, {
+            status: "aide refusée",
+            notificationForOwner: `❌ Le solidaire a refusé votre demande de dépannage.`
+          });
+        }
       }
 
       await deleteDoc(doc(db, "alertes", alerte.id));
@@ -99,6 +102,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }
   };
 
+  // 🔹 Confirmation des frais depuis AcceptModal
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     if (!alerte?.reportId) return;
 
@@ -114,7 +118,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       }
 
       const finalAmount = fraisAnnules ? 0 : montant;
-
       await updateDoc(reportRef, {
         status: "attente séquestre",
         helperUid: user.uid,
@@ -134,7 +137,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }
   };
 
-  // 🔔 Écoute reports pour InProgressModal
+  // 🔔 Écoute des reports pour InProgressModal
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
@@ -142,6 +145,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       snapshot.docs.forEach((docSnap) => {
         const report = { id: docSnap.id, ...docSnap.data() };
 
+        // Si paiement bloqué ou frais 0, ouvrir InProgressModal
         if ((report.escrowStatus === "created" || report.frais === 0) && !inProgressModal.isOpen) {
           setAcceptModal({ isOpen: false, alerte: null });
           setInProgressModal({ isOpen: true, report });
@@ -185,10 +189,11 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         report={inProgressModal.report}
         solidaire={user}
         onComplete={handleReleasePayment}
+        userPosition={userPosition}
       />
 
       <HelpBanner
-        report={inProgressModal.report || null} // Sécurisé
+        report={inProgressModal.report || null}
         onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
       />
 

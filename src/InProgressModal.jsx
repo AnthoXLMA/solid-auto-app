@@ -16,7 +16,6 @@ export default function InProgressModal({
   const [arrived, setArrived] = useState(false);
   const [distance, setDistance] = useState(null);
 
-  // Calcul distance en temps réel
   useEffect(() => {
     if (!isOpen || !userPosition || !report) return;
     const interval = setInterval(() => {
@@ -33,49 +32,41 @@ export default function InProgressModal({
     return () => clearInterval(interval);
   }, [isOpen, userPosition, report]);
 
-  useEffect(() => {
-    if (!isOpen) setLoading(false);
-  }, [isOpen, report, solidaire]);
-
-  if (!isOpen || !report || !solidaire) return null;
-
   const handleArrived = () => {
-    setArrived(true);
-    toast.info("✅ Vous avez confirmé votre arrivée sur place");
+    if (!arrived) {
+      setArrived(true);
+      toast.info("✅ Arrivée confirmée");
+    }
   };
 
   const handleComplete = async () => {
+    if (!arrived) {
+      toast.warn("⚠️ Confirmez votre arrivée avant de libérer le paiement");
+      return;
+    }
+
+    if (!report.frais || report.frais <= 0) {
+      toast.success("✅ Dépannage terminé (sans paiement) !");
+      onComplete?.(report.id);
+      onClose?.();
+      return;
+    }
+
+    setLoading(true);
     try {
-      if (!arrived) {
-        toast.warn("⚠️ Confirmez d'abord votre arrivée avant de libérer le paiement");
-        return;
-      }
-
-      if (!report.frais || report.frais <= 0) {
-        toast.success("✅ Dépannage terminé (sans paiement) !");
-        onComplete?.(report.id);
-        onClose?.();
-        return;
-      }
-
-      setLoading(true);
       setPaymentStatus?.("releasing");
-
       const response = await fetch("http://localhost:4242/release-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
       });
-
       const result = await response.json();
-
       if (result.success) {
         toast.success("💸 Paiement libéré !");
         setPaymentStatus?.("released");
       } else {
         toast.error(`❌ Erreur libération paiement : ${result.error}`);
       }
-
       onComplete?.(report.id);
       onClose?.();
     } catch (err) {
@@ -86,26 +77,24 @@ export default function InProgressModal({
     }
   };
 
+  if (!isOpen || !report || !solidaire) return null;
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in relative">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in">
         <h2 className="text-lg font-bold mb-4">Dépannage en cours</h2>
         <p><strong>Solidaire :</strong> {solidaire.name}</p>
         <p><strong>Sinistré :</strong> {report.ownerName || report.ownerEmail}</p>
         <p><strong>Montant :</strong> {report.frais} €</p>
-        <p><strong>Localisation :</strong> {report.latitude}, {report.longitude}</p>
         {distance && <p><strong>Distance restante :</strong> {distance} km</p>}
         {report.materiel && <p><strong>Matériel :</strong> {report.materiel}</p>}
 
-        {/* PaymentBanner côté sinistré */}
-        {report && solidaire && (
-          <PaymentBanner
-            report={report}
-            solidaire={solidaire}
-            currentUser={{ uid: "sinistre" }}
-            isSinistre={false} // le solidaire est en cours, sinistré gère paiement
-          />
-        )}
+        <PaymentBanner
+          report={report}
+          solidaire={solidaire}
+          currentUser={{ uid: solidaire.uid }}
+          isSinistre={false}
+        />
 
         <div className="flex gap-2 mt-4">
           <button
@@ -115,7 +104,6 @@ export default function InProgressModal({
           >
             {arrived ? "✅ Arrivée confirmée" : "📍 Arrivé sur place"}
           </button>
-
           <button
             onClick={handleComplete}
             disabled={loading || !arrived}
@@ -123,7 +111,6 @@ export default function InProgressModal({
           >
             ✅ {loading ? "Libération en cours..." : "Terminer le dépannage"}
           </button>
-
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"

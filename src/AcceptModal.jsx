@@ -5,6 +5,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
   const distanceKm = alerte?.distance || 0;
   const fraisCalculés = calculateFees(distanceKm);
   const [montant, setMontant] = useState(fraisCalculés);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setMontant(fraisCalculés);
@@ -12,17 +13,20 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
 
   if (!isOpen || !alerte) return null;
 
-  const handleConfirm = (fraisAnnules) => {
-    const frais = fraisAnnules ? 0 : montant;
+  const handleConfirm = async (fraisAnnules) => {
+    if (loading) return;
+    setLoading(true);
 
-    // Mettre à jour le report côté frontend pour déclencher PaymentBanner / InProgressModal
-    const updatedReport = { ...alerte, frais, helperConfirmed: true };
-
-    // ⚡ Côté parent : update report et éventuellement lancer modal solidaire
-    onConfirm(updatedReport, frais);
-
-    onClose();
-    if (onStartRepair) onStartRepair(updatedReport);
+    try {
+      const finalAmount = fraisAnnules ? 0 : Math.max(0, montant); // sécurité
+      await onConfirm?.(alerte, finalAmount, fraisAnnules);
+      onClose?.();
+      if (onStartRepair) onStartRepair({ ...alerte, frais: finalAmount, helperConfirmed: true });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,21 +44,23 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
             type="number"
             value={montant}
             onChange={(e) => setMontant(Number(e.target.value))}
+            min={0}
             className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            placeholder="Ex: 25"
           />
         </div>
 
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => handleConfirm(false)}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            disabled={loading}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
           >
             ✅ Conserver les frais
           </button>
           <button
             onClick={() => handleConfirm(true)}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+            disabled={loading}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
           >
             🙌 Annuler les frais
           </button>
