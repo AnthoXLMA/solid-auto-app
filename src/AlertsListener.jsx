@@ -40,7 +40,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     const unsub = onSnapshot(q, async (snapshot) => {
       const sorted = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
-        console.log("Alertes pour", user.uid, sorted);
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
       setAlerts(sorted);
