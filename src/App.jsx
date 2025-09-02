@@ -453,13 +453,17 @@ useEffect(() => {
       </button>
 
       {/* Utilisateurs en ligne */}
-      <div className="flex flex-col items-center justify-center relative text-center">
+      {/* Utilisateurs en ligne / Bouton pour afficher ModalHelperList */}
+      <button
+        onClick={() => setShowHelperList(true)}
+        className="flex flex-col items-center justify-center relative text-center"
+      >
         👥
         <span className="absolute -top-2 -right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
           {onlineUsers}
         </span>
         <span className="text-xs mt-1">En ligne</span>
-      </div>
+      </button>
     </div>
   </div>
 </div>
