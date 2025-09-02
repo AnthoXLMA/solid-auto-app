@@ -9,42 +9,43 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
+import PaymentBanner from "./PaymentBanner";
+import HelpBanner from "./HelpBanner";
 import { toast } from "react-toastify";
 import { updateUserStatus } from "./userService";
-import HelpBanner from "./HelpBanner";
-import PaymentBanner from "./PaymentBanner"; // ⚡ à afficher côté sinistré
 
 export default function AlertsListener({ user, setSelectedAlert, userPosition, inline }) {
   const [alerts, setAlerts] = useState([]);
   const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
-  const [paymentPending, setPaymentPending] = useState(null); // ⚡ côté sinistré
+  const [paymentPending, setPaymentPending] = useState(null);
 
-  // 🔔 Écoute selon le rôle
+  // 🔔 Écoute des alertes selon le rôle
   useEffect(() => {
     if (!user?.uid || !user?.role) return;
 
     let q;
     if (user.role === "solidaire") {
-      // écoute des alertes destinées à ce solidaire
       q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
     } else {
-      // écoute des alertes envoyées par ce sinistré
       q = query(collection(db, "alertes"), where("fromUid", "==", user.uid));
     }
 
     const unsub = onSnapshot(q, async (snapshot) => {
       const sorted = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
+      console.log("Alertes reçues pour", user.uid, sorted);
       setAlerts(sorted);
 
-      // ⚡ côté sinistré : détecter si un paiement est attendu
+      // côté sinistré : vérifier si paiement attendu
       if (user.role === "sinistré") {
         for (const a of sorted) {
           if (a.reportId) {
@@ -84,15 +85,13 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     try {
       await deleteDoc(doc(db, "alertes", alerte.id));
       toast.info("❌ Alerte rejetée !");
-      if (user?.uid) {
-        await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
-      }
+      if (user?.uid) await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
     } catch (err) {
       console.error("Erreur rejet :", err);
     }
   };
 
-  // 🔹 Validation des frais (AcceptModal → solidaire)
+  // 🔹 Confirmation des frais (AcceptModal)
   const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
     if (!alerte?.reportId || !user?.uid) return;
 
@@ -106,6 +105,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       }
 
       const finalAmount = fraisAnnules ? 0 : montant;
+
       await updateDoc(reportRef, {
         status: "attente séquestre",
         helperUid: user.uid,
@@ -120,14 +120,14 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         report: { id: alerte.reportId, ...reportSnap.data(), frais: finalAmount },
       });
 
-      toast.info("Le sinistré doit bloquer le montant via PaymentBanner.");
+      toast.info("Le sinistré doit maintenant bloquer le montant via PaymentBanner.");
     } catch (err) {
       console.error("Erreur validation frais :", err);
       toast.error("❌ Erreur lors de la validation.");
     }
   };
 
-  // 🔹 Paiement validé (sinistré)
+  // 🔹 Paiement confirmé (sinistré)
   const handlePaymentConfirmed = async (reportId) => {
     try {
       await updateDoc(doc(db, "reports", reportId), { status: "en cours" });
@@ -147,7 +147,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   const content = (
     <>
-      {/* ✅ Modal solidaire */}
       <AcceptModal
         isOpen={acceptModal.isOpen}
         onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
@@ -155,7 +154,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         onConfirm={handleConfirmPricing}
       />
 
-      {/* ✅ Modal partagé */}
       <InProgressModal
         isOpen={inProgressModal.isOpen}
         onClose={() => setInProgressModal({ isOpen: false, report: null })}
@@ -165,7 +163,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         userPosition={userPosition}
       />
 
-      {/* ✅ PaymentBanner côté sinistré */}
       {paymentPending && user.role === "sinistré" && (
         <PaymentBanner
           report={paymentPending}
@@ -173,7 +170,6 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         />
       )}
 
-      {/* ✅ Bannière d’aide (solidaire) */}
       <HelpBanner
         report={inProgressModal.report || null}
         onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
