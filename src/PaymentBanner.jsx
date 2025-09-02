@@ -1,4 +1,3 @@
-// src/PaymentBanner.jsx
 import React, { useState } from "react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -6,10 +5,8 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { toast } from "react-toastify";
 
-// Clé publique Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-// --- StripeCheckout Component ---
 function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -29,17 +26,14 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
         onPaymentSuccess(null);
       } else if (result.paymentIntent) {
         const pi = result.paymentIntent;
-
         if (pi.status === "requires_capture" || pi.status === "succeeded") {
           setStatus("✅ Paiement validé !");
           onPaymentSuccess("pending");
-
           const reportRef = doc(db, "reports", report.id);
           await updateDoc(reportRef, { escrowStatus: "created" });
-
           toast.success(`💰 Paiement validé ! ${report.helperName} peut intervenir.`);
         } else {
-          setStatus("⚠️ Paiement non bloqué. Vérifie la carte.");
+          setStatus("⚠️ Paiement non bloqué");
           onPaymentSuccess(null);
         }
       }
@@ -59,20 +53,12 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
       <button
         onClick={handlePay}
         disabled={!stripe || loading}
-        className={`w-full py-2 rounded-lg text-white font-semibold transition ${
-          loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-        }`}
+        className={`w-full py-2 rounded-lg text-white font-semibold transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
       >
         {loading ? "⏳ Confirmer..." : "Confirmer le paiement"}
       </button>
       {status && (
-        <div
-          className={`mt-2 p-2 rounded text-sm ${
-            status.includes("❌")
-              ? "bg-red-50 text-red-600 border border-red-200"
-              : "bg-green-50 text-green-600 border border-green-200"
-          }`}
-        >
+        <div className={`mt-2 p-2 rounded text-sm ${status.includes("❌") ? "bg-red-50 text-red-600 border border-red-200" : "bg-green-50 text-green-600 border border-green-200"}`}>
           {status}
         </div>
       )}
@@ -80,33 +66,26 @@ function StripeCheckout({ clientSecret, onPaymentSuccess, report }) {
   );
 }
 
-// --- PaymentBanner Component ---
 export default function PaymentBanner({ report, solidaire, currentUser, isSinistre }) {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
 
-  // 🔒 Protection contre undefined
   if (!report || !solidaire || !currentUser) return null;
 
   const isSolidaire = currentUser.uid === solidaire.uid;
 
   const handleCreateEscrow = async () => {
     if (!solidaire?.stripeAccountId) {
-      toast.error("❌ Solidaire non enregistré sur Stripe. Veuillez compléter son onboarding.");
+      toast.error("❌ Solidaire non enregistré sur Stripe.");
       return;
     }
     try {
       const response = await fetch("http://localhost:4242/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: report.id,
-          amount: report.frais,
-          solidaireStripeId: solidaire.stripeAccountId || null,
-        }),
+        body: JSON.stringify({ reportId: report.id, amount: report.frais, solidaireStripeId: solidaire.stripeAccountId }),
       });
       const data = await response.json();
-
       if (data.clientSecret) {
         setClientSecret(data.clientSecret);
         setPaymentStatus("initiated");
@@ -114,7 +93,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
         toast.error("❌ Impossible de créer le séquestre");
       }
     } catch (err) {
-      console.error("Erreur createEscrow frontend:", err);
+      console.error(err);
       toast.error("❌ Erreur côté client");
     }
   };
@@ -125,10 +104,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
       const response = await fetch("http://localhost:4242/release-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: report.id,
-          paymentIntentId: report.paymentIntentId,
-        }),
+        body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
       });
       const data = await response.json();
       if (data.success) setPaymentStatus("released");
@@ -145,10 +121,7 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
       const response = await fetch("http://localhost:4242/refund-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportId: report.id,
-          paymentIntentId: report.paymentIntentId,
-        }),
+        body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
       });
       const data = await response.json();
       if (data.success) setPaymentStatus("refunded");
@@ -161,12 +134,9 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
 
   return (
     <>
-      {/* Solidaire doit créer un compte Stripe */}
-      {!solidaire?.stripeAccountId && solidaire?.uid && solidaire?.email && isSolidaire ? (
+      {!solidaire?.stripeAccountId && isSolidaire ? (
         <div className="text-center">
-          <p className="text-gray-700">
-            ℹ️ Pour recevoir votre paiement, vous devez créer un compte Stripe.
-          </p>
+          <p className="text-gray-700">ℹ️ Pour recevoir votre paiement, créez un compte Stripe.</p>
           <button
             onClick={async () => {
               const res = await fetch("http://localhost:4242/create-stripe-account", {
@@ -194,7 +164,6 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
             💰 Frais : <span className="font-bold text-gray-900">{report.frais} €</span>
           </p>
 
-          {/* 1. Pas encore payé → bouton sinistré */}
           {paymentStatus === null && isSinistre && (
             <button
               onClick={handleCreateEscrow}
@@ -204,48 +173,28 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
             </button>
           )}
 
-          {/* 2. Checkout Stripe */}
           {clientSecret && paymentStatus === "initiated" && (
             <Elements stripe={stripePromise}>
-              <StripeCheckout
-                clientSecret={clientSecret}
-                onPaymentSuccess={setPaymentStatus}
-                report={report}
-              />
+              <StripeCheckout clientSecret={clientSecret} onPaymentSuccess={setPaymentStatus} report={report} />
             </Elements>
           )}
 
-          {/* 3. Paiement bloqué */}
           {paymentStatus === "pending" && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center space-y-3">
-              <p className="text-green-700 font-medium">
-                ✅ Paiement bloqué — le solidaire peut intervenir.
-              </p>
+              <p className="text-green-700 font-medium">✅ Paiement bloqué — le solidaire peut intervenir.</p>
               <div className="flex gap-2">
-                <button
-                  onClick={handleReleaseEscrow}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg transition"
-                >
-                  ✅ Terminer
-                </button>
-                <button
-                  onClick={handleRefundEscrow}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition"
-                >
-                  ❌ Annuler
-                </button>
+                <button onClick={handleReleaseEscrow} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg transition">✅ Terminer</button>
+                <button onClick={handleRefundEscrow} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg transition">❌ Annuler</button>
               </div>
             </div>
           )}
 
-          {/* 4. Intervention terminée */}
           {paymentStatus === "released" && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center text-blue-700 font-medium">
               🎉 Intervention terminée, paiement libéré au solidaire.
             </div>
           )}
 
-          {/* 5. Remboursé */}
           {paymentStatus === "refunded" && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center text-red-700 font-medium">
               💸 Paiement remboursé au sinistré.
