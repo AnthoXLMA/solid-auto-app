@@ -8,12 +8,10 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({}); // { [uid]: { averageNote: 4.5, count: 3 } }
 
-  // Filtrer les helpers avec coords valides
   const validHelpers = helpers.filter(
     (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
-  // Récupérer les avis
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -51,9 +49,8 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
     setCurrentIndex((prev) => (prev === validHelpers.length - 1 ? 0 : prev + 1));
   };
 
-  // ⚡ Crée une alerte Firestore pour le solidaire
   const handleAlert = async (helper) => {
-    if (!activeReport) return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !");
+    if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
     try {
       await addDoc(collection(db, "alertes"), {
@@ -62,6 +59,13 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
         fromUid: activeReport.ownerUid || "sinistre",
         ownerName: activeReport.ownerName || "Sinistré",
         nature: activeReport.nature || "Panne",
+        subType: activeReport.subType || "",
+        incident: activeReport.incident || "",
+        date: activeReport.date || "",
+        time: activeReport.time || "",
+        environment: activeReport.environment || "",
+        needsTow: activeReport.needsTow || false,
+        message: activeReport.message || "",
         timestamp: serverTimestamp(),
         status: "en attente"
       });
@@ -74,15 +78,15 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 overflow-hidden relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative flex flex-col">
         <h3 className="text-center text-xl font-bold mb-4">Utilisateurs disponibles</h3>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <button onClick={handlePrev} className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300">←</button>
 
-          <div className="flex-1 mx-4 p-4 border rounded-2xl shadow flex flex-col items-center
-                          h-[280px] w-full max-w-xs overflow-y-auto">
+          <div className="flex-1 p-4 border rounded-2xl shadow flex flex-col items-center
+                          max-h-[400px] w-full overflow-y-auto">
             <div className="font-medium text-lg text-center">{currentHelper.name}</div>
 
             <div className="text-sm text-gray-500 text-center mt-1">
@@ -93,15 +97,26 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
               ⭐ Note : {reviewsMap[currentHelper.uid]?.averageNote?.toFixed(1) || "N/A"} ({reviewsMap[currentHelper.uid]?.count || 0} avis)
             </div>
 
-            <div className="text-sm text-gray-500 text-center mt-2">
+            <div className="text-sm text-gray-500 mt-2 text-center">
               Matériel : {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
             </div>
 
             <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance} km</div>
 
+            <div className="mt-3 text-left text-gray-600 text-sm w-full">
+              <p><strong>Panne :</strong> {activeReport?.nature || "N/A"}</p>
+              {activeReport?.subType && <p><strong>Sous-type :</strong> {activeReport.subType}</p>}
+              {activeReport?.incident && <p><strong>Incident :</strong> {activeReport.incident}</p>}
+              {activeReport?.environment && <p><strong>Environnement :</strong> {activeReport.environment}</p>}
+              {activeReport?.needsTow && <p><strong>Remorquage nécessaire</strong></p>}
+              {activeReport?.date && <p><strong>Date :</strong> {activeReport.date}</p>}
+              {activeReport?.time && <p><strong>Heure :</strong> {activeReport.time}</p>}
+              {activeReport?.message && <p><strong>Message :</strong> {activeReport.message}</p>}
+            </div>
+
             <button
               onClick={() => handleAlert(currentHelper)}
-              className="mt-auto bg-blue-600 text-white px-3 py-1 rounded-lg"
+              className="mt-auto bg-blue-600 text-white px-3 py-2 rounded-lg w-full"
               disabled={!activeReport}
               title={!activeReport ? "Vous devez avoir un signalement actif" : ""}
             >
