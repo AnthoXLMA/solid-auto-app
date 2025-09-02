@@ -175,6 +175,7 @@ const MapView = forwardRef(({ reports = [], solidaires = [], alerts = [], userPo
 
   const isSinistre = currentUser?.role !== "solidaire";
 
+  console.log("userPosition", userPosition);
   console.log("PaymentBanner props:", currentReport, solidaires.find(s => s.uid === currentReport.helperUid), currentUserUid);
   return (
     <>

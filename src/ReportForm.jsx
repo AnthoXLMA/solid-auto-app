@@ -2,11 +2,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { PANNE_TYPES } from "./constants/pannes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "./firebase";
 import { toast } from "react-toastify";
+import { createReport } from "./reportService";
 
-export default function ReportForm({ userPosition, onClose }) {
+export default function ReportForm({ user, userPosition, onClose }) {
   const [nature, setNature] = useState(PANNE_TYPES[0].value);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,7 +13,6 @@ export default function ReportForm({ userPosition, onClose }) {
   const startX = useRef(0);
   const [cardWidth, setCardWidth] = useState(0);
 
-  // --- Calcul largeur d’une carte (inclut margin)
   useEffect(() => {
     const firstCard = carouselRef.current?.querySelector(".carousel-card");
     if (firstCard) {
@@ -24,44 +22,38 @@ export default function ReportForm({ userPosition, onClose }) {
     }
   }, []);
 
-  // --- Création d’un nouveau report dans Firestore
   const onNewReport = async (reportData) => {
-    if (!userPosition) {
-      toast.error("Position utilisateur inconnue !");
+    if (!user || !userPosition) {
+      toast.error("Utilisateur ou position inconnue !");
       return;
     }
 
     setLoading(true);
     try {
-      const docRef = await addDoc(collection(db, "reports"), {
+      const result = await createReport({
         latitude: reportData.latitude,
         longitude: reportData.longitude,
         nature: reportData.nature,
         message: reportData.message || "",
-        status: "en-attente",
-        timestamp: serverTimestamp(),
-        ownerUid: reportData.ownerUid || null, // uid du sinistré
-        ownerName: reportData.ownerName || null,
         address: reportData.address || "Adresse inconnue",
-        helperUid: null,
-        helperConfirmed: false,
-        frais: 0,
-        paymentIntentId: null,
-        escrowStatus: null,
+        user: { uid: user.uid, displayName: user.name || "Anonyme" },
       });
 
-      toast.success("🚨 Report créé !");
-      onClose();
-      return docRef.id;
+      if (result.success) {
+        toast.success("🚨 Report créé !");
+        onClose();
+        return result.id;
+      } else {
+        toast.error("❌ Impossible de créer le report : " + result.error);
+      }
     } catch (err) {
-      console.error("Erreur création report :", err);
-      toast.error("❌ Impossible de créer le report");
+      console.error(err);
+      toast.error("❌ Erreur lors de la création du report");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Navigation carousel
   const currentIndex = PANNE_TYPES.findIndex((p) => p.value === nature);
   const slideNext = useCallback(() => {
     const nextIndex = (currentIndex + 1) % PANNE_TYPES.length;
@@ -97,14 +89,14 @@ export default function ReportForm({ userPosition, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userPosition) return toast.error("Position inconnue !");
+    if (!user || !userPosition) return toast.error("Utilisateur ou position inconnue !");
     await onNewReport({
       latitude: userPosition[0],
       longitude: userPosition[1],
       nature,
       message,
-      ownerUid: userPosition.uid, // si tu stockes l'UID du sinistré ici
-      ownerName: userPosition.name || null,
+      ownerUid: user.uid,
+      ownerName: user.name || null,
       address: "Adresse inconnue",
     });
   };
