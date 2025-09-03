@@ -141,6 +141,7 @@ const MapView = forwardRef(
       currentUserUid,
       showHelperList,
       setShowHelperList,
+      setSelectedAlert
     },
     ref
   ) => {
@@ -286,6 +287,7 @@ const MapView = forwardRef(
               setShowHelperList(false);
             }}
             setShowHelperList={setShowHelperList}
+            setSelectedAlert={setSelectedAlert}
             onClose={() => setShowHelperList(false)}
           />
         )}

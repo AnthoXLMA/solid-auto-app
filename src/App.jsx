@@ -347,6 +347,7 @@ const handleNewReport = async (newReport) => {
               ref={mapRef}
               showHelperList={showHelperList}
               setShowHelperList={setShowHelperList}
+              setSelectedAlert={setSelectedAlert}
             />
           </div>
         )}
