@@ -16,6 +16,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
 
   if (!isOpen || !alerte) return null;
 
+
   const handleConfirm = async (fraisAnnules) => {
   if (loading) return;
   setLoading(true);
