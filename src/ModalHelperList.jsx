@@ -65,6 +65,7 @@ export default function ModalHelperList({
     if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
     try {
+      // 🔹 Création de l’alerte côté Firestore
       const docRef = await addDoc(collection(db, "alertes"), {
         reportId: activeReport.id,
         toUid: helper.uid,
@@ -76,10 +77,19 @@ export default function ModalHelperList({
         environment: activeReport.environment || "",
         needsTow: activeReport.needsTow || false,
         message: activeReport.message || "",
-        timestamp: serverTimestamp(),
+        // timestamp: serverTimestamp()
+        timestamp: new Date(),
         status: "en attente",
       });
 
+      // 🔹 Mettre à jour le report avec le helper sélectionné
+      if (activeReport?.id) {
+        await updateDoc(doc(db, "reports", activeReport.id), {
+          helperUid: helper.uid
+        });
+      }
+
+      // 🔹 Notifier le parent pour mettre à jour la liste d’alertes
       onNewAlert?.({
         id: docRef.id,
         reportId: activeReport.id,
@@ -96,29 +106,24 @@ export default function ModalHelperList({
         status: "en attente",
       });
 
-      if (activeReport?.id) {
-        await updateDoc(doc(db, "reports", activeReport.id), {
-          helperUid: helper.uid
-        });
-      }
+      // 🔹 Ouvrir immédiatement la pop-up côté solidaire
+      setSelectedAlert?.({
+        id: docRef.id,
+        reportId: activeReport.id,
+        toUid: helper.uid,
+        fromUid: activeReport.ownerUid,
+        ownerName: activeReport.ownerName,
+        nature: activeReport.nature,
+        subType: activeReport.subType,
+        incident: activeReport.incident,
+        environment: activeReport.environment,
+        needsTow: activeReport.needsTow,
+        message: activeReport.message,
+        timestamp: new Date(),
+        status: "en attente",
+      });
 
-
-      // setSelectedAlert?.({
-      //   id: docRef.id,
-      //   reportId: activeReport.id,
-      //   toUid: helper.uid,
-      //   fromUid: activeReport.ownerUid,
-      //   ownerName: activeReport.ownerName,
-      //   nature: activeReport.nature,
-      //   subType: activeReport.subType,
-      //   incident: activeReport.incident,
-      //   environment: activeReport.environment,
-      //   needsTow: activeReport.needsTow,
-      //   message: activeReport.message,
-      //   timestamp: new Date(),
-      //   status: "en attente",
-      // });
-
+      // 🔹 Fermer la modal de sélection de helpers
       setShowHelperList(false);
       onClose?.();
 
@@ -128,6 +133,7 @@ export default function ModalHelperList({
       toast.error("❌ Impossible d’envoyer l’alerte");
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
