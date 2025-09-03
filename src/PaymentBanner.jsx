@@ -81,28 +81,24 @@ export default function PaymentBanner({ report, solidaire, currentUser, isSinist
   const isSolidaire = currentUser.uid === solidaire.uid;
 
   const handleCreateEscrow = async () => {
-    if (!solidaire?.stripeAccountId) {
-      toast.error("❌ Solidaire non enregistré sur Stripe.");
-      return;
-    }
-    try {
-      const response = await fetch("http://localhost:4242/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportId: report.id, amount: report.frais, solidaireStripeId: solidaire.stripeAccountId }),
-      });
-      const data = await response.json();
-      if (data.clientSecret) {
-        setClientSecret(data.clientSecret);
-        setPaymentStatus("initiated");
-      } else {
-        toast.error("❌ Impossible de créer le séquestre");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("❌ Erreur côté client");
-    }
-  };
+  if (!report.helperConfirmed) return toast.warn("Le solidaire doit confirmer avant le paiement.");
+
+  const response = await fetch("http://localhost:4242/create-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reportId: report.id, amount: report.frais, solidaireStripeId: solidaire.stripeAccountId }),
+  });
+  const data = await response.json();
+
+  if (data.clientSecret) {
+    setClientSecret(data.clientSecret);
+    setPaymentStatus("initiated");
+
+    // ⚡ Sauvegarde paymentIntentId
+    await updateDoc(doc(db, "reports", report.id), { paymentIntentId: data.paymentIntentId });
+  }
+};
+
 
   const handleReleaseEscrow = async () => {
     if (!report?.paymentIntentId || paymentStatus !== "pending") return;

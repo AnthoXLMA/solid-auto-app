@@ -100,7 +100,10 @@ export default function ReportForm({
     ownerName: user?.username || user?.name || user?.email || "Anonyme",
     address: "Adresse inconnue",
     timestamp: new Date().toISOString(),
+    frais: 0, // montant initial
+    helperConfirmed: false, // pas encore confirmé
   });
+
 
   const submitToParentOrService = async (payload) => {
     // Si parent fournit onNewReport => déléguer la création au parent (App.jsx)
