@@ -30,17 +30,19 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
+    console.log("⚡ [AlertsListener] Alertes reçues :", sorted); // <-- Ajouté
+
       setAlerts(sorted);
 
       if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
 
-      // ⚡ Pour le solidaire : ouvrir automatiquement la modal sur la première alerte en attente
+      // ⚡ Pour le solidaire : ouvrir automatiquement la modal sur la première alerte "en attente" ou "envoyée"
       if (user.role === "solidaire") {
-        const pending = sorted.find(a => a.status === "en attente");
+        const pending = sorted.find(a => ["en attente", "envoyée"].includes(a.status));
         if (pending && (!currentAlert || pending.id !== currentAlert.id)) {
           setCurrentAlert(pending);
           setSelectedAlert(pending);
-          toast.info(`🚨 Nouvelle alerte de ${pending.ownerName || "un sinistré"} !`);
+          toast.info(`🚨 Nouvelle alerte de ${pending.ownerName || pending.fromUid}`);
         }
       }
 
@@ -77,8 +79,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
       if (alerte.reportId) {
         await updateDoc(doc(db, "reports", alerte.reportId), { helperConfirmed: true });
       }
-      setCurrentAlert(null);
-      setSelectedAlert(null);
+      setCurrentAlert(alerte);
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
       console.error("Erreur acceptation :", err);
@@ -99,16 +100,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
     }
   };
 
-  // 🔹 Couleur du statut pour la liste
-  const statusColor = status => {
-    switch (status) {
-      case "en attente": return "bg-yellow-100";
-      case "accepté": return "bg-green-100";
-      case "refusé": return "bg-red-100";
-      default: return "bg-gray-100";
-    }
-  };
-
+  // 🔹 JSX final à rendre
   return (
     <>
       {/* Modals */}
@@ -116,10 +108,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
         isOpen={!!currentAlert}
         onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
         alerte={currentAlert}
-        onAccept={acceptAlert}
-        onReject={rejectAlert}
       />
-
       <InProgressModal
         isOpen={!!currentReport}
         onClose={() => setCurrentReport(null)}
@@ -128,14 +117,12 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
         onComplete={() => setCurrentReport(null)}
         userPosition={userPosition}
       />
-
       {paymentPending && user.role === "sinistré" && (
         <PaymentBanner
           report={paymentPending}
           onConfirm={() => setPaymentPending(null)}
         />
       )}
-
       <HelpBanner
         report={currentReport || null}
         onComplete={() => setCurrentReport(null)}
@@ -143,29 +130,20 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
 
       {/* Liste des alertes pour le solidaire */}
       {alerts.length > 0 && user.role === "solidaire" && (
-        <ul className="space-y-3 mt-2">
+        <ul className="space-y-3">
           {alerts.map(a => (
-            <li key={a.id} className={`p-3 rounded-lg shadow-sm ${statusColor(a.status)}`}>
+            <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
               <h5 className="font-medium">
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
               </h5>
               <div className="flex gap-2 mt-2">
-                <button
-                  className="px-2 py-1 bg-gray-200 rounded"
-                  onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}
-                >
+                <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}>
                   📍 Voir
                 </button>
-                <button
-                  className="px-2 py-1 bg-green-600 text-white rounded"
-                  onClick={() => acceptAlert(a)}
-                >
+                <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>
                   ✅ Accepter
                 </button>
-                <button
-                  className="px-2 py-1 bg-red-600 text-white rounded"
-                  onClick={() => rejectAlert(a)}
-                >
+                <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>
                   ❌ Refuser
                 </button>
               </div>
