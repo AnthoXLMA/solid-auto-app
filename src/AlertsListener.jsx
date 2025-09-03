@@ -1,3 +1,4 @@
+// src/AlertsListener.jsx
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
@@ -33,17 +34,17 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
 
       if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
 
-      // ⚡ Solidaires : ouvrir modal sur la première alerte en attente et toast
+      // ⚡ Pour le solidaire : ouvrir automatiquement la modal sur la première alerte en attente
       if (user.role === "solidaire") {
         const pending = sorted.find(a => a.status === "en attente");
         if (pending && (!currentAlert || pending.id !== currentAlert.id)) {
           setCurrentAlert(pending);
           setSelectedAlert(pending);
-          toast.info(`⚡ Nouvelle alerte de ${pending.ownerName || "Un sinistré"}`);
+          toast.info(`🚨 Nouvelle alerte de ${pending.ownerName || "un sinistré"} !`);
         }
       }
 
-      // 🔹 Sinistré : vérifier paiements en attente
+      // 🔹 Pour le sinistré : vérifier s'il y a un paiement en attente
       if (user.role === "sinistré") {
         for (const a of sorted) {
           if (a.reportId && (!paymentPending || paymentPending.id !== a.reportId)) {
@@ -76,7 +77,8 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
       if (alerte.reportId) {
         await updateDoc(doc(db, "reports", alerte.reportId), { helperConfirmed: true });
       }
-      setCurrentAlert(alerte);
+      setCurrentAlert(null);
+      setSelectedAlert(null);
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
       console.error("Erreur acceptation :", err);
@@ -97,23 +99,32 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
     }
   };
 
-  // 🔹 JSX final à rendre
+  // 🔹 Couleur du statut pour la liste
+  const statusColor = status => {
+    switch (status) {
+      case "en attente": return "bg-yellow-100";
+      case "accepté": return "bg-green-100";
+      case "refusé": return "bg-red-100";
+      default: return "bg-gray-100";
+    }
+  };
+
   return (
     <>
       {/* Modals */}
-      {user.role === "solidaire" && (
-        <AcceptModal
-          isOpen={!!currentAlert}
-          onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
-          alerte={currentAlert}
-        />
-      )}
+      <AcceptModal
+        isOpen={!!currentAlert}
+        onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
+        alerte={currentAlert}
+        onAccept={acceptAlert}
+        onReject={rejectAlert}
+      />
 
       <InProgressModal
         isOpen={!!currentReport}
         onClose={() => setCurrentReport(null)}
         report={currentReport}
-        solidaire={user.role === "solidaire" ? user : null}
+        solidaire={user}
         onComplete={() => setCurrentReport(null)}
         userPosition={userPosition}
       />
@@ -132,9 +143,9 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
 
       {/* Liste des alertes pour le solidaire */}
       {alerts.length > 0 && user.role === "solidaire" && (
-        <ul className="space-y-3">
+        <ul className="space-y-3 mt-2">
           {alerts.map(a => (
-            <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
+            <li key={a.id} className={`p-3 rounded-lg shadow-sm ${statusColor(a.status)}`}>
               <h5 className="font-medium">
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
               </h5>

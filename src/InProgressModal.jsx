@@ -1,10 +1,10 @@
+// src/InProgressModal.jsx
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getDistanceKm } from "./utils/distance";
 import PaymentBanner from "./PaymentBanner";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
-
 
 export default function InProgressModal({
   isOpen,
@@ -19,9 +19,10 @@ export default function InProgressModal({
   const [arrived, setArrived] = useState(false);
   const [distance, setDistance] = useState(null);
 
-
+  // 🔄 Calcul de distance en continu
   useEffect(() => {
     if (!isOpen || !userPosition || !report) return;
+
     const interval = setInterval(() => {
       if (report.latitude && report.longitude) {
         const dist = getDistanceKm(
@@ -30,37 +31,49 @@ export default function InProgressModal({
           report.latitude,
           report.longitude
         );
-        setDistance(dist.toFixed(2));
+        setDistance(Number(dist.toFixed(2)));
       }
     }, 5000);
+
     return () => clearInterval(interval);
   }, [isOpen, userPosition, report]);
 
+  // 🔹 Confirmation de l'arrivée
   const handleArrived = async () => {
-  if (!arrived) {
+    if (arrived) return;
     setArrived(true);
     toast.info("✅ Arrivée confirmée");
 
-    await updateDoc(doc(db, "reports", report.id), { arrivedAt: new Date().toISOString() });
-  }
-};
+    try {
+      await updateDoc(doc(db, "reports", report.id), {
+        arrivedAt: new Date().toISOString(),
+        status: "en cours",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("❌ Impossible de confirmer l'arrivée");
+    }
+  };
 
-
+  // 🔹 Terminer le dépannage / libérer paiement
   const handleComplete = async () => {
     if (!arrived) {
       toast.warn("⚠️ Confirmez votre arrivée avant de libérer le paiement");
       return;
     }
 
-    if (!report.frais || report.frais <= 0) {
-      toast.success("✅ Dépannage terminé (sans paiement) !");
-      onComplete?.(report.id);
-      onClose?.();
-      return;
-    }
-
     setLoading(true);
     try {
+      // Si pas de frais à payer
+      if (!report.frais || report.frais <= 0) {
+        toast.success("✅ Dépannage terminé (sans paiement) !");
+        await updateDoc(doc(db, "reports", report.id), { status: "terminé" });
+        onComplete?.(report.id);
+        onClose?.();
+        return;
+      }
+
+      // Appel API paiement
       setPaymentStatus?.("releasing");
       const response = await fetch("http://localhost:4242/release-payment", {
         method: "POST",
@@ -68,12 +81,15 @@ export default function InProgressModal({
         body: JSON.stringify({ reportId: report.id, paymentIntentId: report.paymentIntentId }),
       });
       const result = await response.json();
+
       if (result.success) {
         toast.success("💸 Paiement libéré !");
         setPaymentStatus?.("released");
+        await updateDoc(doc(db, "reports", report.id), { status: "terminé" });
       } else {
         toast.error(`❌ Erreur libération paiement : ${result.error}`);
       }
+
       onComplete?.(report.id);
       onClose?.();
     } catch (err) {
@@ -93,7 +109,7 @@ export default function InProgressModal({
         <p><strong>Solidaire :</strong> {solidaire.name}</p>
         <p><strong>Sinistré :</strong> {report.ownerName || report.ownerEmail}</p>
         <p><strong>Montant :</strong> {report.frais} €</p>
-        {distance && <p><strong>Distance restante :</strong> {distance} km</p>}
+        {distance !== null && <p><strong>Distance restante :</strong> {distance} km</p>}
         {report.materiel && <p><strong>Matériel :</strong> {report.materiel}</p>}
 
         <PaymentBanner

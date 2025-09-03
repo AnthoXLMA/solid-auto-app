@@ -1,52 +1,56 @@
+// src/AcceptModal.jsx
 import React, { useState, useEffect } from "react";
 import { calculateFees } from "./utils/calculateFees";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
-
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
   const distanceKm = alerte?.distance || 0;
-  const fraisCalculés = calculateFees(distanceKm);
-  const [montant, setMontant] = useState(fraisCalculés);
+  const fraisEstimés = calculateFees(distanceKm);
+
+  const [montant, setMontant] = useState(fraisEstimés);
   const [loading, setLoading] = useState(false);
 
+  // 🔄 Met à jour le montant quand l'alerte change
   useEffect(() => {
-    setMontant(fraisCalculés);
-  }, [fraisCalculés]);
+    setMontant(fraisEstimés);
+  }, [fraisEstimés]);
 
   if (!isOpen || !alerte) return null;
 
+  const handleConfirm = async (annulerFrais = false) => {
+    if (loading) return;
+    setLoading(true);
 
-  const handleConfirm = async (fraisAnnules) => {
-  if (loading) return;
-  setLoading(true);
+    try {
+      const finalAmount = annulerFrais ? 0 : Math.max(0, montant);
 
-  try {
-    const finalAmount = fraisAnnules ? 0 : Math.max(0, montant);
-    await onConfirm?.(alerte, finalAmount, fraisAnnules);
+      // Appel du callback parent
+      await onConfirm?.(alerte, finalAmount, annulerFrais);
 
-    // ⚡ Mise à jour Firestore
-    const reportRef = doc(db, "reports", alerte.reportId);
-    await updateDoc(reportRef, { frais: finalAmount });
+      // ⚡ Mise à jour Firestore
+      const reportRef = doc(db, "reports", alerte.reportId);
+      await updateDoc(reportRef, { frais: finalAmount, helperConfirmed: true });
 
-    onClose?.();
-    if (onStartRepair) onStartRepair({ ...alerte, frais: finalAmount, helperConfirmed: true });
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+      // Callback pour démarrer le dépannage si nécessaire
+      onStartRepair?.({ ...alerte, frais: finalAmount, helperConfirmed: true });
 
-if (!isOpen || !alerte) return null;
+      onClose?.();
+    } catch (err) {
+      console.error("Erreur lors de la confirmation :", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-11/12 animate-fade-in">
         <h2 className="text-lg font-bold mb-4">Confirmer le dépannage</h2>
+
         <p className="mb-4 text-sm text-gray-700">
-          Souhaitez-vous <strong>conserver</strong> les frais ({fraisCalculés} € estimés)
-          ou les <strong>annuler</strong> ?
+          Souhaitez-vous <strong>conserver</strong> les frais (
+          {fraisEstimés} € estimés) ou les <strong>annuler</strong> ?
         </p>
 
         <div className="mb-4">
