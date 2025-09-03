@@ -256,30 +256,45 @@ const handleNewReport = async (newReport) => {
       return { ...s, alreadyAlerted, pendingAlertsCount, status };
     });
 
-  // -------------------- Alert user --------------------
-  const onAlertUser = async (solidaire) => {
-    if (!activeReport || !user) return;
-    try {
-      await addDoc(collection(db, "alertes"), {
-        fromUid: user.uid,
-        toUid: solidaire.uid,
-        reportId: activeReport.id,
-        status: "envoyée",
-        timestamp: serverTimestamp(),
-      });
-      await updateDoc(doc(db, "reports", activeReport.id), {
-        status: "aide en cours",
-        helperUid: solidaire.uid,
-      });
-      setActiveReport((prev) =>
-        prev ? { ...prev, status: "aide en cours", helperUid: solidaire.uid } : prev
-      );
-      toast.success(`✅ Alerte envoyée à ${solidaire.name || solidaire.uid} !`);
-    } catch (err) {
-      console.error("Erreur alerte :", err);
-      toast.error("⚠️ Impossible d'envoyer l'alerte.");
+// -------------------- Alert user --------------------
+const onAlertUser = async (solidaire) => {
+  if (!activeReport || !user) return;
+
+  try {
+    // 1️⃣ Crée l'alerte côté Firestore
+    const alertRef = await addDoc(collection(db, "alertes"), {
+      fromUid: user.uid,
+      fromName: user.username || user.email,
+      toUid: solidaire.uid,
+      ownerName: user.username || user.email,
+      reportId: activeReport.id,
+      status: "en attente", // ← important pour le listener
+      nature: activeReport.nature || "Panne",
+      timestamp: serverTimestamp(),
+    });
+
+    // 2️⃣ Mets à jour le report avec le helper proposé
+    await updateDoc(doc(db, "reports", activeReport.id), {
+      status: "aide en cours",
+      helperUid: solidaire.uid,
+    });
+
+    // 3️⃣ Mets à jour localement l'activeReport pour que la UI réagisse
+    setActiveReport((prev) =>
+      prev ? { ...prev, status: "aide en cours", helperUid: solidaire.uid } : prev
+    );
+
+    // 4️⃣ Toast seulement côté solidaire
+    if (user.role === "solidaire") {
+      toast.info(`🚨 Nouvelle alerte de ${user.username || user.email}`);
     }
-  };
+
+  } catch (err) {
+    console.error("Erreur alerte :", err);
+    toast.error("⚠️ Impossible d'envoyer l'alerte.");
+  }
+};
+
 
   // -------------------- Cancel report --------------------
   const cancelReport = async (reportId) => {
@@ -392,6 +407,14 @@ const handleNewReport = async (newReport) => {
             setSelectedAlert={setSelectedAlert}
             userPosition={currentPosition}
             onNewAlert={(alerte) => setAlerts(prev => [alerte, ...prev])} // <-- nouveau
+          />
+        )}
+
+        {showAlertHistory && (
+          <AlertHistory
+            alerts={alerts}
+            onClose={() => setShowAlertHistory(false)}
+            user={user}
           />
         )}
 
