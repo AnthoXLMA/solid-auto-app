@@ -17,21 +17,18 @@ export default function ModalHelperList({
   const [reviewsMap, setReviewsMap] = useState({});
 
   const validHelpers = helpers.filter(
-    (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
+    h => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
-  // --- Fetch avis pour chaque helper ---
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
       await Promise.all(
-        validHelpers.map(async (h) => {
+        validHelpers.map(async h => {
           const q = query(collection(db, "reviews"), where("toUid", "==", h.uid));
           const snap = await getDocs(q);
           const avis = snap.docs.map(d => d.data());
-          const averageNote = avis.length > 0
-            ? avis.reduce((sum, r) => sum + r.note, 0) / avis.length
-            : 0;
+          const averageNote = avis.length ? avis.reduce((sum, r) => sum + r.note, 0) / avis.length : 0;
           map[h.uid] = { averageNote, count: avis.length };
         })
       );
@@ -40,32 +37,19 @@ export default function ModalHelperList({
     fetchReviews();
   }, [validHelpers]);
 
-  if (!validHelpers || validHelpers.length === 0) return null;
+  if (!validHelpers.length) return null;
 
   const currentHelper = validHelpers[currentIndex];
+  const distance = getDistanceKm(userPosition[0], userPosition[1], currentHelper.latitude, currentHelper.longitude);
 
-  // --- Calcul distance sécurisé ---
-  const distanceRaw =
-    typeof currentHelper.latitude === "number" &&
-    typeof currentHelper.longitude === "number"
-      ? getDistanceKm(userPosition[0], userPosition[1], currentHelper.latitude, currentHelper.longitude)
-      : 0;
-  const distance = Number(distanceRaw) || 0;
+  const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
+  const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
 
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? validHelpers.length - 1 : prev - 1));
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev === validHelpers.length - 1 ? 0 : prev + 1));
-  };
-
-  // --- Création d’une alerte Firestore et update parent ---
-  const handleAlert = async (helper) => {
+  const handleAlert = async helper => {
     if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
     try {
-      // 🔹 Création de l’alerte côté Firestore
+      // 1️⃣ Création alerte
       const docRef = await addDoc(collection(db, "alertes"), {
         reportId: activeReport.id,
         toUid: helper.uid,
@@ -77,20 +61,17 @@ export default function ModalHelperList({
         environment: activeReport.environment || "",
         needsTow: activeReport.needsTow || false,
         message: activeReport.message || "",
-        // timestamp: serverTimestamp()
-        timestamp: new Date(),
+        timestamp: serverTimestamp(),
         status: "en attente",
       });
 
-      // 🔹 Mettre à jour le report avec le helper sélectionné
+      // 2️⃣ Mettre à jour le report avec helperUid
       if (activeReport?.id) {
-        await updateDoc(doc(db, "reports", activeReport.id), {
-          helperUid: helper.uid
-        });
+        await updateDoc(doc(db, "reports", activeReport.id), { helperUid: helper.uid });
       }
 
-      // 🔹 Notifier le parent pour mettre à jour la liste d’alertes
-      onNewAlert?.({
+      // 3️⃣ Mettre à jour parent et solidaire
+      const newAlert = {
         id: docRef.id,
         reportId: activeReport.id,
         toUid: helper.uid,
@@ -104,26 +85,11 @@ export default function ModalHelperList({
         message: activeReport.message,
         timestamp: new Date(),
         status: "en attente",
-      });
+      };
 
-      // 🔹 Ouvrir immédiatement la pop-up côté solidaire
-      setSelectedAlert?.({
-        id: docRef.id,
-        reportId: activeReport.id,
-        toUid: helper.uid,
-        fromUid: activeReport.ownerUid,
-        ownerName: activeReport.ownerName,
-        nature: activeReport.nature,
-        subType: activeReport.subType,
-        incident: activeReport.incident,
-        environment: activeReport.environment,
-        needsTow: activeReport.needsTow,
-        message: activeReport.message,
-        timestamp: new Date(),
-        status: "en attente",
-      });
+      onNewAlert?.(newAlert);
+      setSelectedAlert?.(newAlert);
 
-      // 🔹 Fermer la modal de sélection de helpers
       setShowHelperList(false);
       onClose?.();
 
@@ -133,7 +99,6 @@ export default function ModalHelperList({
       toast.error("❌ Impossible d’envoyer l’alerte");
     }
   };
-
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
@@ -146,7 +111,7 @@ export default function ModalHelperList({
           <div className="flex-1 p-4 border rounded-2xl shadow flex flex-col items-center max-h-[400px] w-full overflow-y-auto">
             <div className="font-medium text-lg text-center">{currentHelper.name}</div>
             <div className="text-sm text-gray-500 text-center mt-1">
-              🏷 Rôle : {currentHelper.role ? currentHelper.role.replace(/_/g, " ") : "Non spécifié"}
+              🏷 Rôle : {currentHelper.role?.replace(/_/g, " ") || "Non spécifié"}
             </div>
             <div className="text-sm text-gray-500 text-center mt-1">
               ⭐ Note : {reviewsMap[currentHelper.uid]?.averageNote?.toFixed(1) || "N/A"} ({reviewsMap[currentHelper.uid]?.count || 0} avis)
