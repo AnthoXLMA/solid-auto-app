@@ -38,6 +38,7 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
   }
 };
 
+if (!isOpen || !alerte) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
