@@ -280,11 +280,11 @@ const MapView = forwardRef(
             helpers={filteredSolidairesWithCoords}
             userPosition={userPosition}
             activeReport={activeReport}
-            onAlert={(helper) => {
-              if (!activeReport)
-                return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !");
-              alertHelper(helper);
-              setShowHelperList(false);
+            onNewAlert={(newAlert) => {
+              // Mettre à jour la liste globale des alertes
+              // ou simplement déléguer à AlertsListener
+              setSelectedAlert(newAlert);
+              toast.info(`⚡ Alerte envoyée à ${newAlert.ownerName}`);
             }}
             setShowHelperList={setShowHelperList}
             setSelectedAlert={setSelectedAlert}

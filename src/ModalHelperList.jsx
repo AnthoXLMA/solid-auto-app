@@ -20,6 +20,7 @@ export default function ModalHelperList({
     h => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
+  // Fetch reviews
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -40,7 +41,15 @@ export default function ModalHelperList({
   if (!validHelpers.length) return null;
 
   const currentHelper = validHelpers[currentIndex];
-  const distance = getDistanceKm(userPosition[0], userPosition[1], currentHelper.latitude, currentHelper.longitude);
+
+  // ✅ Forcer distance à être un number
+  const rawDistance = getDistanceKm(
+    userPosition?.[0],
+    userPosition?.[1],
+    currentHelper?.latitude,
+    currentHelper?.longitude
+  );
+  const distance = Number(rawDistance) || 0;
 
   const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
   const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
@@ -65,12 +74,12 @@ export default function ModalHelperList({
         status: "en attente",
       });
 
-      // 2️⃣ Mettre à jour le report avec helperUid
+      // 2️⃣ Mise à jour report avec helperUid
       if (activeReport?.id) {
         await updateDoc(doc(db, "reports", activeReport.id), { helperUid: helper.uid });
       }
 
-      // 3️⃣ Mettre à jour parent et solidaire
+      // 3️⃣ Mettre à jour parent/solidaire
       const newAlert = {
         id: docRef.id,
         reportId: activeReport.id,
