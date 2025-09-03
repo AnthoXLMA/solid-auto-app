@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { toast } from "react-toastify";
 
-// Modals et composants
+// Modals
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
 import ModalHelperList from "./ModalHelperList";
@@ -60,13 +60,13 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
     iconSize: [35, 35],
     iconAnchor: [18, 18],
   });
-}
+};
 
 // --- Utilitaires Map ---
 function SetViewOnUser({ position }) {
   const map = useMap();
   useEffect(() => {
-    if (position) map.setView(position, 15);
+    if (position && position[0] != null && position[1] != null) map.setView(position, 15);
   }, [position, map]);
   return null;
 }
@@ -74,16 +74,14 @@ function SetViewOnUser({ position }) {
 function FlyToLocation({ alert }) {
   const map = useMap();
   useEffect(() => {
-    if (!alert) return;
-    const { latitude, longitude } = alert;
-    if (typeof latitude !== "number" || typeof longitude !== "number") return;
-    map.flyTo([latitude, longitude], 15, { animate: true });
+    if (!alert || alert.latitude == null || alert.longitude == null) return;
+    map.flyTo([alert.latitude, alert.longitude], 15, { animate: true });
     toast.info("📍 Zoom sur la panne sélectionnée");
   }, [alert, map]);
   return null;
 }
 
-// --- MapView principal ---
+// --- MapView ---
 const MapView = forwardRef(({
   reports = [],
   solidaires = [],
@@ -109,28 +107,27 @@ const MapView = forwardRef(({
   if (!Array.isArray(userPosition) || userPosition.length < 2)
     return <div>📍 Localisation en cours...</div>;
 
-  // --- Inclure tous les solidaires, même si pas de report actif ---
-  const filteredSolidaires = solidaires.map((s) => {
-    const isOffline = !s.online;
-    const alreadyAlerted = activeReport ? alerts.some(a => a.toUid === s.uid && a.reportId === activeReport.id) : false;
-    const materielArray = Array.isArray(s.materiel) ? s.materiel : [s.materiel].filter(Boolean);
-    const isRelevant = activeReport?.nature && materielArray.some(m => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
+  // --- Filtrage sécurisé des solidaires ---
+  const filteredSolidaires = solidaires
+    .filter(s => s.latitude != null && s.longitude != null)
+    .map((s) => {
+      const isOffline = !s.online;
+      const alreadyAlerted = activeReport ? alerts.some(a => a.toUid === s.uid && a.reportId === activeReport.id) : false;
+      const materielArray = Array.isArray(s.materiel) ? s.materiel : [s.materiel].filter(Boolean);
+      const isRelevant = activeReport?.nature && materielArray.some(m => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
 
-    let status = "available";
-    if (isOffline) status = "offline";
-    else if (alreadyAlerted) status = "alerted";
-    else if (isRelevant) status = "relevant";
+      let status = "available";
+      if (isOffline) status = "offline";
+      else if (alreadyAlerted) status = "alerted";
+      else if (isRelevant) status = "relevant";
 
-    return { ...s, status, alreadyAlerted };
-  });
+      return { ...s, status, alreadyAlerted };
+    });
 
-  // --- calcul distance sécurisé ---
+  // --- Calcul distances ---
   const distances = {};
-  filteredSolidaires.forEach((s) => {
-    if (s.latitude != null && s.longitude != null) {
-      const d = Number(getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude));
-      distances[s.uid] = isNaN(d) ? 0 : d;
-    } else distances[s.uid] = 0;
+  filteredSolidaires.forEach(s => {
+    distances[s.uid] = Number(getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude)) || 0;
   });
 
   return (
@@ -140,7 +137,7 @@ const MapView = forwardRef(({
         isOpen={isAcceptOpen}
         onClose={() => setIsAcceptOpen(false)}
         alerte={currentReport}
-        onConfirm={(report, montant, fraisAnnules) => {
+        onConfirm={(report) => {
           setCurrentReport(report);
           setIsAcceptOpen(false);
           setIsInProgressOpen(true);
@@ -191,7 +188,7 @@ const MapView = forwardRef(({
         </Marker>
 
         {/* Reports */}
-        {reports.map((report) => (
+        {reports.filter(r => r.latitude != null && r.longitude != null).map(report => (
           <Marker
             key={report.id}
             position={[report.latitude, report.longitude]}
@@ -208,20 +205,17 @@ const MapView = forwardRef(({
         ))}
 
         {/* Solidaires */}
-        {filteredSolidaires.map((s) => {
-          const isOffline = !s.online;
-          let status = "available";
-          if (isOffline) status = "offline";
+        {filteredSolidaires.map(s => {
           const alertForSolidaire = activeReport
-            ? alerts.find((a) => a.reportId === activeReport.id && a.toUid === s.uid)
+            ? alerts.find(a => a.reportId === activeReport.id && a.toUid === s.uid)
             : null;
+          let status = s.status;
           if (activeReport?.helperUid === s.uid) {
             if (activeReport.helperConfirmed) status = "busy";
             else if (alertForSolidaire) status = "alerted";
           }
-
+          const alertCount = alerts.filter(a => a.toUid === s.uid).length;
           const distance = distances[s.uid] || 0;
-          const alertCount = alerts.filter((a) => a.toUid === s.uid).length;
 
           return (
             <Marker

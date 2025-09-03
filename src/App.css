@@ -50,6 +50,22 @@
   animation: fade-in 0.25s ease-out forwards;
 }
 
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: gray;
+  color: white;
+  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
 .pulse-badge {
   position: absolute;
   top: -6px;
