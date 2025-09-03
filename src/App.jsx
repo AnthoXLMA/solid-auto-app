@@ -5,17 +5,17 @@ import Auth from "./Auth";
 import MapView from "./MapView";
 import ReportForm from "./ReportForm";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   onSnapshot,
   doc,
   setDoc,
-  deleteDoc,
   getDoc,
   addDoc,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
   query,
   where,
 } from "firebase/firestore";
@@ -44,7 +44,6 @@ export default function App() {
   const [showHelperList, setShowHelperList] = useState(false);
   const [showPanneModal, setShowPanneModal] = useState(false);
   const [page, setPage] = useState("map");
-  const [unreadMessages, setUnreadMessages] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [showChat, setShowChat] = useState(false);
 
@@ -55,31 +54,31 @@ export default function App() {
   // -------------------- Auth --------------------
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-          const userRef = doc(db, "solidaires", currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            setUser({ uid: currentUser.uid, email: currentUser.email, ...userSnap.data() });
-          } else {
-            const newUser = {
-              uid: currentUser.uid,
-              email: currentUser.email,
-              username: currentUser.displayName || currentUser.email.split("@")[0],
-              materiel: "batterie",
-              online: true,
-            };
-            await setDoc(userRef, newUser);
-            setUser(newUser);
-          }
-        } catch (err) {
-          console.error("Erreur récupération user :", err);
-          setUser(currentUser);
+      if (!currentUser) return setUser(null);
+
+      try {
+        const userRef = doc(db, "solidaires", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          setUser({ uid: currentUser.uid, email: currentUser.email, ...userSnap.data() });
+        } else {
+          const newUser = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            username: currentUser.displayName || currentUser.email.split("@")[0],
+            materiel: "batterie",
+            online: true,
+          };
+          await setDoc(userRef, newUser);
+          setUser(newUser);
         }
-      } else {
-        setUser(null);
+      } catch (err) {
+        console.error("Erreur récupération user :", err);
+        setUser(currentUser);
       }
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -89,14 +88,13 @@ export default function App() {
       toast.warning("⚠️ Géolocalisation non supportée par votre navigateur.");
       return;
     }
+
     const watcher = navigator.geolocation.watchPosition(
       (pos) => setCurrentPosition([pos.coords.latitude, pos.coords.longitude]),
-      (err) => {
-        console.warn("Erreur géoloc :", err.message);
-        toast.warning("⚠️ Impossible de récupérer votre position. Position par défaut utilisée.");
-      },
+      (err) => toast.warning("⚠️ Impossible de récupérer votre position."),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+
     return () => navigator.geolocation.clearWatch(watcher);
   }, []);
 
@@ -107,13 +105,14 @@ export default function App() {
     updateDoc(userRef, { online: true }).catch(() => {});
     const handleBeforeUnload = () => updateDoc(userRef, { online: false }).catch(() => {});
     window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       updateDoc(userRef, { online: false }).catch(() => {});
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [user]);
 
-  // -------------------- Solidaires --------------------
+  // -------------------- Solidaires & Online --------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
       const allSolidaires = snapshot.docs.map((doc) => doc.data() || {});
@@ -129,6 +128,7 @@ export default function App() {
     const unsub = onSnapshot(collection(db, "reports"), (snapshot) => {
       const allReports = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setReports(allReports);
+
       if (activeReport) {
         const updated = allReports.find((r) => r.id === activeReport.id);
         if (updated) setActiveReport(updated);
@@ -136,31 +136,6 @@ export default function App() {
     });
     return () => unsub();
   }, [user, activeReport?.id]);
-
-
-  const handleNewReport = async (newReport) => {
-  if (!user) return;
-  try {
-    const docRef = await addDoc(collection(db, "reports"), {
-      ...newReport,
-      ownerUid: user.uid,
-      helperUid: null,
-      notified: false,
-      status: "en attente",
-      timestamp: serverTimestamp(),
-    });
-    const createdReport = { ...newReport, id: docRef.id }; // <-- important
-    setActiveReport(createdReport);
-    setShowHelperList(true);
-    toast.success("✅ Demande de panne créée !");
-    return createdReport; // <-- retourne l'objet pour ReportForm
-  } catch (err) {
-    console.error("Erreur création report :", err);
-    toast.error("⚠️ Impossible de créer le rapport.");
-    return null;
-  }
-};
-
 
   // -------------------- Alerts --------------------
   useEffect(() => {
@@ -172,68 +147,72 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  // -------------------- Navigation --------------------
-  const navigateTo = (path) => {
-    navigate(`/${path}`);
-    setPage(path);
+  // -------------------- Créer un report --------------------
+  const handleNewReport = async (payload) => {
+    if (!user) return null;
+    try {
+      const docRef = await addDoc(collection(db, "reports"), {
+        ...payload,
+        ownerUid: user.uid,
+        helperUid: null,
+        notified: false,
+        status: "en attente",
+        timestamp: serverTimestamp(),
+      });
+
+      const createdReport = { ...payload, id: docRef.id };
+      setActiveReport(createdReport);
+      setShowHelperList(true);
+      toast.success("✅ Demande de panne créée !");
+      return createdReport;
+    } catch (err) {
+      console.error("Erreur création report :", err);
+      toast.error("⚠️ Impossible de créer le rapport.");
+      return null;
+    }
   };
 
-  // -------------------- Filter helpers --------------------
-  const filteredSolidaires = useMemo(() => {
-    if (!solidaires || !Array.isArray(solidaires)) return [];
-    return solidaires
-      .filter((s) => s.uid !== user?.uid)
-      .map((s) => {
-        const pendingAlertsCount = alerts.filter((a) => a.toUid === s.uid).length;
-        const alreadyAlerted = s.alerts?.includes(activeReport?.id) || false;
-        const materielArray = Array.isArray(s.materiel) ? s.materiel : [s.materiel].filter(Boolean);
-        const isRelevant = activeReport?.nature && materielArray.some((m) => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
-        let status = "irrelevant";
-        if (alreadyAlerted) status = "alerted";
-        else if (isRelevant) status = "relevant";
-        if (pendingAlertsCount > 0) status = "alerted";
-        return { ...s, alreadyAlerted, pendingAlertsCount, status };
-      });
-  }, [solidaires, activeReport, alerts, user]);
-
-  // -------------------- Alert user --------------------
+  // -------------------- Envoyer alerte à un solidaire --------------------
   const onAlertUser = async (solidaire) => {
-  if (!activeReport || !activeReport.id || !user) {
-    toast.error("❌ Aucune panne active sélectionnée !");
-    return;
-  }
-  try {
-    await addDoc(collection(db, "alertes"), {
-      reportId: activeReport.id,
-      fromUid: user.uid,
-      fromName: user.username || user.email,
-      toUid: solidaire.uid,
-      ownerName: user.username || user.email,
-      status: "en attente",
-      nature: activeReport.nature || "Panne",
-      timestamp: serverTimestamp(),
-    });
-    await updateDoc(doc(db, "reports", activeReport.id), {
-      status: "aide en cours",
-      helperUid: solidaire.uid,
-    });
-    setActiveReport((prev) =>
-      prev ? { ...prev, status: "aide en cours", helperUid: solidaire.uid } : prev
-    );
-  } catch (err) {
-    console.error("Erreur alerte :", err);
-    toast.error("⚠️ Impossible d'envoyer l'alerte.");
-  }
-};
+    if (!activeReport || !activeReport.id || !user) {
+      toast.error("❌ Aucune panne active sélectionnée !");
+      return;
+    }
 
+    try {
+      await addDoc(collection(db, "alertes"), {
+        reportId: activeReport.id,
+        fromUid: user.uid,
+        fromName: user.username || user.email,
+        toUid: solidaire.uid,
+        ownerName: user.username || user.email,
+        status: "en attente",
+        nature: activeReport.nature || "Panne",
+        timestamp: serverTimestamp(),
+      });
 
-  // -------------------- Cancel report --------------------
+      await updateDoc(doc(db, "reports", activeReport.id), {
+        status: "aide en cours",
+        helperUid: solidaire.uid,
+      });
+
+      setActiveReport(prev => prev ? { ...prev, status: "aide en cours", helperUid: solidaire.uid } : prev);
+      toast.success(`🚨 Alerte envoyée à ${solidaire.username || solidaire.email}`);
+    } catch (err) {
+      console.error("Erreur alerte :", err);
+      toast.error("⚠️ Impossible d'envoyer l'alerte.");
+    }
+  };
+
+  // -------------------- Annuler un report --------------------
   const cancelReport = async (reportId) => {
     if (!user) return;
+
     try {
       const reportDoc = await getDoc(doc(db, "reports", reportId));
       if (!reportDoc.exists()) return toast.error("⚠️ Report introuvable.");
-      if (reportDoc.data().ownerUid !== user.uid) return toast.error("⛔ Vous ne pouvez pas annuler la panne d'un autre utilisateur !");
+      if (reportDoc.data().ownerUid !== user.uid)
+        return toast.error("⛔ Vous ne pouvez pas annuler la panne d'un autre utilisateur !");
       await deleteDoc(doc(db, "reports", reportId));
       setActiveReport(null);
       toast.info("🗑️ Votre demande de panne a été annulée !");
@@ -243,6 +222,24 @@ export default function App() {
     }
   };
 
+  // -------------------- Helpers filtrés pour la carte --------------------
+  const filteredSolidaires = useMemo(() => {
+    if (!solidaires || !Array.isArray(solidaires)) return [];
+    return solidaires
+      .filter(s => s.uid !== user?.uid)
+      .map(s => {
+        const pendingAlertsCount = alerts.filter(a => a.toUid === s.uid).length;
+        const alreadyAlerted = s.alerts?.includes(activeReport?.id) || false;
+        const materielArray = Array.isArray(s.materiel) ? s.materiel : [s.materiel].filter(Boolean);
+        const isRelevant = activeReport?.nature && materielArray.some(m => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
+        let status = "irrelevant";
+        if (alreadyAlerted) status = "alerted";
+        else if (isRelevant) status = "relevant";
+        if (pendingAlertsCount > 0) status = "alerted";
+        return { ...s, alreadyAlerted, pendingAlertsCount, status };
+      });
+  }, [solidaires, activeReport, alerts, user]);
+
   if (!user) return <Auth setUser={setUser} />;
 
   return (
@@ -250,14 +247,12 @@ export default function App() {
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
         <h1 className="text-xl font-bold">Bienvenue {user.username || user.email}</h1>
-        <div className="relative">
-          <button
-            onClick={() => setShowProfileForm((prev) => !prev)}
-            className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg"
-          >
-            {user.username ? user.username[0].toUpperCase() : "U"}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowProfileForm(prev => !prev)}
+          className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg"
+        >
+          {user.username ? user.username[0].toUpperCase() : "U"}
+        </button>
       </header>
 
       {/* Main */}
@@ -287,8 +282,8 @@ export default function App() {
             onUpdate={(updatedUser) => {
               const sanitizedUser = {
                 uid: updatedUser.uid,
-                name: updatedUser.name,
                 username: updatedUser.username,
+                name: updatedUser.name,
                 email: updatedUser.email,
                 materiel: updatedUser.materiel,
                 latitude: updatedUser.latitude || 43.4923,
@@ -305,41 +300,13 @@ export default function App() {
             <ReportForm
               user={user}
               userPosition={currentPosition}
-              onNewReport={async (payload) => {
-                if (!user) return;
-
-                try {
-                  // Création du report dans Firestore
-                  const docRef = await addDoc(collection(db, "reports"), {
-                    ...payload,
-                    ownerUid: user.uid,
-                    helperUid: null,
-                    notified: false,
-                    status: "en attente",
-                    timestamp: serverTimestamp(),
-                  });
-
-                  const createdReport = { ...payload, id: docRef.id }; // <-- récupère l'ID Firestore
-                  setActiveReport(createdReport);
-                  setShowHelperList(true);
-                  setShowReportForm(false);
-
-                  toast.success("✅ Demande de panne créée !");
-                  return createdReport; // ReportForm peut éventuellement l’utiliser
-                } catch (err) {
-                  console.error("Erreur création report :", err);
-                  toast.error("⚠️ Impossible de créer le rapport.");
-                  return null;
-                }
-              }}
+              onNewReport={handleNewReport}
               onClose={() => setShowReportForm(false)}
             />
           </div>
         )}
 
-
         {showAlertHistory && <AlertHistory alerts={alerts} onClose={() => setShowAlertHistory(false)} user={user} />}
-
         {showPanneModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-lg p-4 w-[90%] max-w-md max-h-[80%] overflow-y-auto">
@@ -348,9 +315,7 @@ export default function App() {
             </div>
           </div>
         )}
-
         {showChat && <Chat user={user} onClose={() => setShowChat(false)} />}
-
         {showHelperList && (
           <ModalHelperList
             helpers={filteredSolidaires}
@@ -376,7 +341,10 @@ export default function App() {
               <FaTachometerAlt size={24} />
               <span className="text-xs mt-1">Dashboard</span>
             </button>
-            <button onClick={() => { if (page !== "map") setPage("map"); else mapRef.current?.recenter?.(); }} className="flex flex-col items-center text-center">
+            <button
+              onClick={() => { if (page !== "map") setPage("map"); else mapRef.current?.recenter?.(); }}
+              className="flex flex-col items-center text-center"
+            >
               <FaMapMarkedAlt size={24} />
               <span className="text-xs mt-1">Carte</span>
             </button>
@@ -411,7 +379,10 @@ export default function App() {
 
       {/* Bouton + */}
       <div className="fixed bottom-20 right-4 z-50">
-        <button onClick={() => setShowReportForm(true)} className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110">+</button>
+        <button
+          onClick={() => setShowReportForm(true)}
+          className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full shadow-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white transition-transform hover:scale-110"
+        >+</button>
       </div>
 
       <footer className="bg-gray-100 text-center text-sm text-gray-500 p-2">
