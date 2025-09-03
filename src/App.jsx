@@ -31,6 +31,8 @@ import Chat from "./Chat";
 import ProfileForm from "./ProfileForm";
 import AlertHistory from "./AlertHistory";
 import Dashboard from "./Dashboard";
+import UserReports from "./UserReports";
+
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -397,6 +399,23 @@ const handleNewReport = async (newReport) => {
             <PayButton report={activeReport} />
           </div>
         )}*/}
+        {showPanneModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-4 w-[90%] max-w-md max-h-[80%] overflow-y-auto">
+              <UserReports
+                userReports={userReports}
+                users={solidaires}
+                cancelReport={cancelReport}
+              />
+              <button
+                onClick={() => setShowPanneModal(false)}
+                className="mt-4 w-full bg-gray-200 py-2 rounded-lg"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 {/* Menu flottant responsive */}
 <div className="fixed bottom-0 left-0 w-full bg-white shadow-t z-50">
@@ -405,9 +424,13 @@ const handleNewReport = async (newReport) => {
     {/* Gauche : Dashboard / Carte avec compteur de reports */}
     <div className="flex items-center space-x-4">
       {/* Nombre de pannes/reports */}
-      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
-        ⚡ {reports.length}
-      </span>
+      <button
+        onClick={() => setShowPanneModal(true)}
+        className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center"
+      >
+        ⚡ {userReports.length}
+      </button>
+
 
       <button
         onClick={() => setPage("dashboard")}

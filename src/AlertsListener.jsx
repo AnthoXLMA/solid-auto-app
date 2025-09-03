@@ -22,32 +22,26 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
   const [paymentPending, setPaymentPending] = useState(null);
 
-  // 🔔 Écoute des alertes selon le rôle
+  // 🔔 Écoute des alertes en fonction du rôle
   useEffect(() => {
     if (!user?.uid || !user?.role) return;
 
-    let q;
-    if (user.role === "solidaire") {
-      q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
-    } else {
-      q = query(collection(db, "alertes"), where("fromUid", "==", user.uid));
-    }
+    const q = query(
+      collection(db, "alertes"),
+      user.role === "solidaire" ? where("toUid", "==", user.uid) : where("fromUid", "==", user.uid)
+    );
 
     const unsub = onSnapshot(q, async (snapshot) => {
       const sorted = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-      console.log("Alertes reçues pour", user.uid, sorted);
-
       setAlerts(sorted);
 
-      // ⚡ Propager la nouvelle alerte au parent si onNewAlert existe
       if (onNewAlert && sorted.length > 0) {
         onNewAlert(sorted);
       }
 
-      // côté sinistré : vérifier si paiement attendu
       if (user.role === "sinistré") {
         for (const a of sorted) {
           if (a.reportId) {
@@ -68,8 +62,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔹 Accepter une alerte (solidaire)
   const acceptAlert = async (alerte) => {
-    if (!alerte?.id || alerte.status === "accepté" || alerte.status === "refusé") return;
-
+    if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
       setAcceptModal({ isOpen: true, alerte });
@@ -110,10 +103,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
       />
 
       {paymentPending && user.role === "sinistré" && (
-        <PaymentBanner
-          report={paymentPending}
-          onConfirm={() => setPaymentPending(null)}
-        />
+        <PaymentBanner report={paymentPending} onConfirm={() => setPaymentPending(null)} />
       )}
 
       <HelpBanner
@@ -121,37 +111,18 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         onComplete={() => setInProgressModal({ isOpen: false, report: null })}
       />
 
-      {alerts.length === 0 ? (
-        <p>Aucune alerte pour l’instant</p>
-      ) : (
+      {alerts.length > 0 && user.role === "solidaire" && (
         <ul className="space-y-3">
           {alerts.map((a) => (
             <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
               <h5 className="font-medium">
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
               </h5>
-              {user.role === "solidaire" && (
-                <div className="flex gap-2 mt-2">
-                  <button
-                    className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => setSelectedAlert(a)}
-                  >
-                    📍 Voir
-                  </button>
-                  <button
-                    className="px-2 py-1 bg-green-600 text-white rounded"
-                    onClick={() => acceptAlert(a)}
-                  >
-                    ✅ Accepter
-                  </button>
-                  <button
-                    className="px-2 py-1 bg-red-600 text-white rounded"
-                    onClick={() => rejectAlert(a)}
-                  >
-                    ❌ Refuser
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2 mt-2">
+                <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => setSelectedAlert(a)}>📍 Voir</button>
+                <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>✅ Accepter</button>
+                <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>❌ Refuser</button>
+              </div>
             </li>
           ))}
         </ul>
@@ -160,8 +131,8 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   );
 
   return inline ? content : (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto pointer-events-none">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full pointer-events-auto">
         {content}
       </div>
     </div>
