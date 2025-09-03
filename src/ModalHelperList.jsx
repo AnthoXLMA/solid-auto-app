@@ -5,21 +5,21 @@ import { db } from "./firebase";
 import { toast } from "react-toastify";
 
 export default function ModalHelperList({
-  helpers = [],  // <-- valeur par défaut
+  helpers = [],
   onClose,
-  userPosition = [0, 0], // <-- fallback
+  userPosition = [0, 0],
   activeReport,
-  onNewAlert,
   setShowHelperList,
-  setSelectedAlert
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({});
 
+  // Filtrer les helpers valides
   const validHelpers = helpers.filter(
     h => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
+  // Charger les avis
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -40,7 +40,6 @@ export default function ModalHelperList({
   if (!validHelpers.length) return null;
 
   const currentHelper = validHelpers[currentIndex];
-
   const distance = Number(getDistanceKm(
     userPosition?.[0] || 0,
     userPosition?.[1] || 0,
@@ -51,32 +50,40 @@ export default function ModalHelperList({
   const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
   const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
 
+  // 🔹 Envoyer une alerte au helper
   const handleAlert = async (helper) => {
-  if (!activeReport || !activeReport.id) {
-    toast.error("❌ Aucune panne active sélectionnée !");
-    return;
-  }
+    if (!activeReport || !activeReport.id) {
+      toast.error("❌ Aucune panne active sélectionnée !");
+      return;
+    }
 
-  try {
-    await addDoc(collection(db, "alertes"), {
-      reportId: activeReport.id,   // ✅ sûr maintenant
-      toUid: helper.uid,
-      fromUid: activeReport.ownerUid || "sinistré",
-      ownerName: activeReport.ownerName || "Sinistré",
-      nature: activeReport.nature || "Panne",
-      timestamp: serverTimestamp(),
-      status: "en attente",
-      handled: false,
-    });
+    try {
+      // Créer l'alerte
+      await addDoc(collection(db, "alertes"), {
+        reportId: activeReport.id,
+        toUid: helper.uid,
+        fromUid: activeReport.ownerUid,
+        ownerName: activeReport.ownerName,
+        nature: activeReport.nature || "Panne",
+        timestamp: serverTimestamp(),
+        status: "en attente",
+        handled: false,
+      });
 
-    setShowHelperList(false);
-    onClose?.();
-  } catch (err) {
-    console.error(err);
-    toast.error("❌ Impossible d’envoyer l’alerte");
-  }
-};
+      // Mettre à jour le report
+      await updateDoc(doc(db, "reports", activeReport.id), {
+        status: "aide en cours",
+        helperUid: helper.uid,
+      });
 
+      toast.success(`🚨 Alerte envoyée à ${helper.username || helper.name || helper.email}`);
+      setShowHelperList(false);
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("❌ Impossible d’envoyer l’alerte");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
