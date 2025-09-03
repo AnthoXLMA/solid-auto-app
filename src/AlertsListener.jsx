@@ -22,7 +22,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
   const [paymentPending, setPaymentPending] = useState(null);
 
-  // 🔔 Écoute des alertes en fonction du rôle
+  // 🔔 Écoute des alertes selon le rôle
   useEffect(() => {
     if (!user?.uid || !user?.role) return;
 
@@ -38,9 +38,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
       setAlerts(sorted);
 
-      if (onNewAlert && sorted.length > 0) {
-        onNewAlert(sorted);
-      }
+      if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
 
       if (user.role === "sinistré") {
         for (const a of sorted) {
@@ -60,30 +58,39 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     return () => unsub();
   }, [user, onNewAlert]);
 
+  // 🔹 Nettoyage du modal si l’alerte a disparu
+  useEffect(() => {
+    if (!alerts.find(a => a.id === acceptModal.alerte?.id)) {
+      setAcceptModal({ isOpen: false, alerte: null });
+    }
+  }, [alerts, acceptModal.alerte]);
+
   // 🔹 Accepter une alerte (solidaire)
   const acceptAlert = async (alerte) => {
-  if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
-  try {
-    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+    if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
+    try {
+      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
 
-    // ⚡ Mettre helperConfirmed = true dans le report
-    const reportRef = doc(db, "reports", alerte.reportId);
-    await updateDoc(reportRef, { helperConfirmed: true });
+      // ⚡ Marquer helperConfirmed dans le report
+      if (alerte.reportId) {
+        const reportRef = doc(db, "reports", alerte.reportId);
+        await updateDoc(reportRef, { helperConfirmed: true });
+      }
 
-    setAcceptModal({ isOpen: true, alerte });
-    toast.success("✅ Alerte acceptée !");
-  } catch (err) {
-    console.error("Erreur acceptation :", err);
-    toast.error("❌ Une erreur est survenue lors de l’acceptation.");
-  }
-};
-
+      setAcceptModal({ isOpen: true, alerte });
+      toast.success("✅ Alerte acceptée !");
+    } catch (err) {
+      console.error("Erreur acceptation :", err);
+      toast.error("❌ Une erreur est survenue lors de l’acceptation.");
+    }
+  };
 
   // 🔹 Rejeter une alerte (solidaire)
   const rejectAlert = async (alerte) => {
     if (!alerte?.id) return;
     try {
       await deleteDoc(doc(db, "alertes", alerte.id));
+      setSelectedAlert(null); // Évite modal vide
       toast.info("❌ Alerte rejetée !");
     } catch (err) {
       console.error("Erreur rejet :", err);
@@ -94,7 +101,10 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     <>
       <AcceptModal
         isOpen={acceptModal.isOpen}
-        onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+        onClose={() => {
+          setAcceptModal({ isOpen: false, alerte: null });
+          setSelectedAlert(null);
+        }}
         alerte={acceptModal.alerte}
         onConfirm={() => {}}
       />
@@ -125,9 +135,27 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
               </h5>
               <div className="flex gap-2 mt-2">
-                <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => setSelectedAlert(a)}>📍 Voir</button>
-                <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>✅ Accepter</button>
-                <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>❌ Refuser</button>
+                <button
+                  className="px-2 py-1 bg-gray-200 rounded"
+                  onClick={() => {
+                    setSelectedAlert(a);
+                    setAcceptModal({ isOpen: true, alerte: a }); // s'assurer que modal reçoit les données
+                  }}
+                >
+                  📍 Voir
+                </button>
+                <button
+                  className="px-2 py-1 bg-green-600 text-white rounded"
+                  onClick={() => acceptAlert(a)}
+                >
+                  ✅ Accepter
+                </button>
+                <button
+                  className="px-2 py-1 bg-red-600 text-white rounded"
+                  onClick={() => rejectAlert(a)}
+                >
+                  ❌ Refuser
+                </button>
               </div>
             </li>
           ))}
