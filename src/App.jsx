@@ -30,9 +30,11 @@ import Dashboard from "./Dashboard";
 import UserReports from "./UserReports";
 import Chat from "./Chat";
 import ModalHelperList from "./ModalHelperList";
+import { fakeSolidaires } from './fakeUsers';
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [solidaires, setSolidaires] = useState(fakeSolidaires);
   const [currentPosition, setCurrentPosition] = useState([46.959095, 4.858485]);
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
@@ -264,20 +266,17 @@ export default function App() {
       <main className="flex-1 relative">
         {page === "map" && (
           <MapView
+            solidaires={solidaires}
             reports={reports}
-            solidaires={filteredHelpers}
             alerts={alerts}
             userPosition={currentPosition}
-            onPositionChange={setCurrentPosition}
-            onReportClick={setActiveReport}
-            onAlertUser={onAlertUser}
-            activeReport={activeReport}
-            cancelReport={cancelReport}
-            currentUserUid={user.uid}
-            ref={mapRef}
-            style={{ height: "100%", width: "100%" }}
+            currentUserUid="currentUser123"
+            onReportClick={(r) => console.log(r)}
+            onAlertUser={(u) => console.log("Alert sent to", u)}
+            cancelReport={(id) => console.log("Cancel report", id)}
+            showHelperList={false}
+            setShowHelperList={() => {}}
           />
-
         )}
 
         {page === "dashboard" && <Dashboard user={user} />}

@@ -23,6 +23,8 @@ const reportIcon = new L.Icon({
   iconSize: [45, 45],
 });
 
+
+
 const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   let baseIconUrl;
   switch (status) {
@@ -61,6 +63,9 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
     iconAnchor: [18, 18],
   });
 };
+
+const DEFAULT_CENTER = [46.603354, 1.888334]; // Centre approximatif de la France
+const DEFAULT_ZOOM = 20; // zoom large pour voir la France entière
 
 // --- Utilitaires Map ---
 function SetViewOnUser({ position }) {
@@ -168,8 +173,8 @@ const MapView = forwardRef(({
       )}
 
       <MapContainer
-        center={userPosition}
-        zoom={13}
+        center={userPosition && userPosition.length === 2 ? userPosition : DEFAULT_CENTER}
+        zoom={userPosition && userPosition.length === 2 ? 13 : DEFAULT_ZOOM}
         style={{ height: "100%", width: "100%", zIndex: 0 }}
         ref={mapRef}
         scrollWheelZoom
@@ -216,6 +221,7 @@ const MapView = forwardRef(({
           }
           const alertCount = alerts.filter(a => a.toUid === s.uid).length;
           const distance = distances[s.uid] || 0;
+          console.log("Solidaires filtrés :", filteredSolidaires);
 
           return (
             <Marker
