@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getDistanceKm } from "./utils/distance";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 import { toast } from "react-toastify";
 
@@ -10,16 +10,15 @@ export default function ModalHelperList({
   userPosition = [0, 0],
   activeReport,
   setShowHelperList,
+  onAlert,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({});
 
-  // Filtrer les helpers valides
   const validHelpers = helpers.filter(
     h => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
-  // Charger les avis
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -49,41 +48,6 @@ export default function ModalHelperList({
 
   const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
   const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
-
-  // 🔹 Envoyer une alerte au helper
-  const handleAlert = async (helper) => {
-    if (!activeReport || !activeReport.id) {
-      toast.error("❌ Aucune panne active sélectionnée !");
-      return;
-    }
-
-    try {
-      // Créer l'alerte
-      await addDoc(collection(db, "alertes"), {
-        reportId: activeReport.id,
-        toUid: helper.uid,
-        fromUid: activeReport.ownerUid,
-        ownerName: activeReport.ownerName,
-        nature: activeReport.nature || "Panne",
-        timestamp: serverTimestamp(),
-        status: "en attente",
-        handled: false,
-      });
-
-      // Mettre à jour le report
-      await updateDoc(doc(db, "reports", activeReport.id), {
-        status: "aide en cours",
-        helperUid: helper.uid,
-      });
-
-      toast.success(`🚨 Alerte envoyée à ${helper.username || helper.name || helper.email}`);
-      setShowHelperList(false);
-      onClose?.();
-    } catch (err) {
-      console.error(err);
-      toast.error("❌ Impossible d’envoyer l’alerte");
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
@@ -115,7 +79,7 @@ export default function ModalHelperList({
             </div>
 
             <button
-              onClick={() => handleAlert(currentHelper)}
+              onClick={() => onAlert(currentHelper)}
               className="mt-auto bg-blue-600 text-white px-3 py-2 rounded-lg w-full"
               disabled={!activeReport}
               title={!activeReport ? "Vous devez avoir un signalement actif" : ""}
