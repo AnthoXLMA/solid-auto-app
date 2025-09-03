@@ -13,7 +13,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   const [currentReport, setCurrentReport] = useState(null);
   const [paymentPending, setPaymentPending] = useState(null);
 
-  // 🔔 Écoute des alertes
+  // 🔔 Écoute des alertes en temps réel
   useEffect(() => {
     if (!user?.uid || !user?.role) return;
 
@@ -24,14 +24,24 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
         : where("fromUid", "==", user.uid)
     );
 
-    const unsub = onSnapshot(q, async (snapshot) => {
+    const unsub = onSnapshot(q, async snapshot => {
       const sorted = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
       setAlerts(sorted);
       if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
 
+      // ⚡ Gestion solidaire : ouvrir modal sur alerte en attente
+      if (user.role === "solidaire") {
+        const pending = sorted.find(a => a.status === "en attente");
+        if (pending && (!currentAlert || pending.id !== currentAlert.id)) {
+          setCurrentAlert(pending);
+          setSelectedAlert(pending);
+        }
+      }
+
+      // 🔹 Gestion sinistré : vérifier paiement en attente
       if (user.role === "sinistré") {
         for (const a of sorted) {
           if (a.reportId && (!paymentPending || paymentPending.id !== a.reportId)) {
@@ -43,29 +53,21 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
           }
         }
       }
-
-      if (user.role === "solidaire") {
-        const pendingAlert = sorted.find((a) => a.status === "en attente");
-        if (pendingAlert) {
-          setCurrentAlert(pendingAlert);
-          setSelectedAlert(pendingAlert);
-        }
-      }
     });
 
     return () => unsub();
-  }, [user, onNewAlert, setSelectedAlert, paymentPending]);
+  }, [user, onNewAlert, setSelectedAlert, paymentPending, currentAlert]);
 
   // 🔹 Nettoyage modal si alerte disparue
   useEffect(() => {
-    if (!alerts.find((a) => a.id === currentAlert?.id)) {
+    if (!alerts.find(a => a.id === currentAlert?.id)) {
       setCurrentAlert(null);
       setSelectedAlert(null);
     }
   }, [alerts, currentAlert, setSelectedAlert]);
 
   // 🔹 Accepter une alerte
-  const acceptAlert = async (alerte) => {
+  const acceptAlert = async alerte => {
     if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
@@ -79,7 +81,7 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   };
 
   // 🔹 Rejeter une alerte
-  const rejectAlert = async (alerte) => {
+  const rejectAlert = async alerte => {
     if (!alerte?.id) return;
     try {
       await deleteDoc(doc(db, "alertes", alerte.id));
@@ -91,69 +93,58 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
     }
   };
 
-  // --- Contenu modals / liste
-  const content = (
-    <>
-      <AcceptModal
-        isOpen={currentAlert !== null}
-        onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
-        alerte={currentAlert}
-        onConfirm={() => {}}
+return (
+  <>
+    <AcceptModal
+      isOpen={!!currentAlert}
+      onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
+      alerte={currentAlert}
+    />
+
+    <InProgressModal
+      isOpen={!!currentReport}
+      onClose={() => setCurrentReport(null)}
+      report={currentReport}
+      solidaire={user}
+      onComplete={() => setCurrentReport(null)}
+      userPosition={userPosition}
+    />
+
+    {paymentPending && user.role === "sinistré" && (
+      <PaymentBanner
+        report={paymentPending}
+        onConfirm={() => setPaymentPending(null)}
       />
+    )}
 
-      <InProgressModal
-        isOpen={currentReport !== null}
-        onClose={() => setCurrentReport(null)}
-        report={currentReport}
-        solidaire={user}
-        onComplete={() => setCurrentReport(null)}
-        userPosition={userPosition}
-      />
+    <HelpBanner
+      report={currentReport || null}
+      onComplete={() => setCurrentReport(null)}
+    />
 
-      {paymentPending && user.role === "sinistré" && (
-        <PaymentBanner
-          report={paymentPending}
-          onConfirm={() => setPaymentPending(null)}
-        />
-      )}
-
-      <HelpBanner
-        report={currentReport || null}
-        onComplete={() => setCurrentReport(null)}
-      />
-
-      {alerts.length > 0 && user.role === "solidaire" && (
-        <ul className="space-y-3">
-          {alerts.map((a) => (
-            <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
-              <h5 className="font-medium">
-                🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
-              </h5>
-              <div className="flex gap-2 mt-2">
-                <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}>
-                  📍 Voir
-                </button>
-                <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>
-                  ✅ Accepter
-                </button>
-                <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>
-                  ❌ Refuser
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
-
-  return inline ? (
-    content
-  ) : (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto pointer-events-none">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full pointer-events-auto">
-        {content}
-      </div>
-    </div>
+    {alerts.length > 0 && user.role === "solidaire" && (
+      <ul className="space-y-3">
+        {alerts.map(a => (
+          <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
+            <h5 className="font-medium">
+              🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
+            </h5>
+            <div className="flex gap-2 mt-2">
+              <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}>
+                📍 Voir
+              </button>
+              <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>
+                ✅ Accepter
+              </button>
+              <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>
+                ❌ Refuser
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </>
   );
 }
+
