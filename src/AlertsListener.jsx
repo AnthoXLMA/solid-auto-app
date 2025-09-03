@@ -1,101 +1,73 @@
-// src/AlertsListener.jsx
-import React, { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  doc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "./firebase";
 import AcceptModal from "./AcceptModal";
 import InProgressModal from "./InProgressModal";
-import PaymentBanner from "./PaymentBanner";
-import HelpBanner from "./HelpBanner";
 import { toast } from "react-toastify";
+import { updateUserStatus } from "./userService";
+import { createEscrow, releaseEscrow } from "./services/escrowService";
+import HelpBanner from "./HelpBanner";
 
-export default function AlertsListener({ user, setSelectedAlert, userPosition, onNewAlert }) {
+export default function AlertsListener({ user, setSelectedAlert }) {
   const [alerts, setAlerts] = useState([]);
-  const [currentAlert, setCurrentAlert] = useState(null);
-  const [currentReport, setCurrentReport] = useState(null);
-  const [paymentPending, setPaymentPending] = useState(null);
+  const [removingIds, setRemovingIds] = useState([]);
+  const [acceptModal, setAcceptModal] = useState({ isOpen: false, alerte: null });
+  const [inProgressModal, setInProgressModal] = useState({ isOpen: false, report: null });
+  const [paymentStatus, setPaymentStatus] = useState(null);
 
-  // Ref pour éviter de spammer les toasts
-  const lastToastId = useRef(null);
-
-  // 🔔 Écoute des alertes en temps réel
+  // 🔥 Marquer le solidaire en ligne
   useEffect(() => {
-    if (!user?.uid || !user?.role) return;
+    if (!user) return;
+    const userRef = doc(db, "solidaires", user.uid);
+    updateDoc(userRef, { status: "disponible" }).catch(console.error);
+    return () => updateDoc(userRef, { status: "indisponible" }).catch(console.error);
+  }, [user]);
 
-    const q = query(
-      collection(db, "alertes"),
-      user.role === "solidaire"
-        ? where("toUid", "==", user.uid)
-        : where("fromUid", "==", user.uid)
-    );
-
-    const unsub = onSnapshot(q, async snapshot => {
+  // 🔔 Écoute des alertes
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
       const sorted = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-      console.log("⚡ [AlertsListener] Alertes reçues :", sorted);
+      const initialized = sorted.map(a => ({ ...a, status: a.status || "en attente" }));
+      setAlerts(initialized);
 
-      setAlerts(sorted);
-
-      if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
-
-      // ⚡ Pour le solidaire : ouvrir automatiquement la première alerte "en attente"
-      if (user.role === "solidaire") {
-        const pending = sorted.find(a => ["en attente", "envoyée"].includes(a.status));
-        if (pending && (!currentAlert || pending.id !== currentAlert.id)) {
-          setCurrentAlert(pending);
-          setSelectedAlert(pending);
-
-          // éviter les doublons de toast
-          if (lastToastId.current !== pending.id) {
-            toast.info(`🚨 Nouvelle alerte de ${pending.ownerName || pending.fromUid}`);
-            lastToastId.current = pending.id;
-          }
-        }
-      }
-
-      // 🔹 Pour le sinistré : vérifier paiement en attente
-      if (user.role === "sinistré") {
-        const reports = await Promise.all(
-          sorted
-            .filter(a => a.reportId && (!paymentPending || paymentPending.id !== a.reportId))
-            .map(async a => {
-              const snap = await getDoc(doc(db, "reports", a.reportId));
-              return snap.exists() ? { id: a.reportId, ...snap.data() } : null;
-            })
-        );
-
-        const waiting = reports.find(r => r && r.status === "attente séquestre");
-        if (waiting) setPaymentPending(waiting);
-      }
+      const newStatus = initialized.length > 0 ? "en attente de réponse" : "disponible";
+      updateDoc(doc(db, "solidaires", user.uid), { status: newStatus }).catch(console.error);
     });
-
     return () => unsub();
-  }, [user, onNewAlert, setSelectedAlert]); // ✅ pas de dépendances instables ici
+  }, [user]);
 
-  // 🔹 Nettoyage si l'alerte courante disparaît
-  useEffect(() => {
-    if (!alerts.find(a => a.id === currentAlert?.id)) {
-      setCurrentAlert(null);
-      setSelectedAlert(null);
-    }
-  }, [alerts, currentAlert, setSelectedAlert]);
+  const removeAlertWithAnimation = (id) => {
+    setRemovingIds((prev) => [...prev, id]);
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      setRemovingIds((prev) => prev.filter((rid) => rid !== id));
+    }, 300);
+  };
 
-  // 🔹 Accepter une alerte
-  const acceptAlert = async alerte => {
-    if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
+  const acceptAlert = async (alerte) => {
+    if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
+    if (alerte.status === "accepté" || alerte.status === "refusé") return;
+
     try {
       await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+      await updateDoc(doc(db, "solidaires", user.uid), { status: "aide en cours" });
 
-      if (alerte.reportId) {
-        await updateDoc(doc(db, "reports", alerte.reportId), { helperConfirmed: true });
-
-        // charger le rapport complet pour ouvrir la modal "InProgress"
-        const snap = await getDoc(doc(db, "reports", alerte.reportId));
-        if (snap.exists()) setCurrentReport({ id: snap.id, ...snap.data() });
-      }
-
-      setCurrentAlert({ ...alerte, status: "accepté" }); // ✅ maj locale immédiate
+      setAcceptModal({ isOpen: true, alerte });
       toast.success("✅ Alerte acceptée !");
     } catch (err) {
       console.error("Erreur acceptation :", err);
@@ -103,78 +75,182 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
     }
   };
 
-  // 🔹 Rejeter une alerte
-  const rejectAlert = async alerte => {
-    if (!alerte?.id) return;
+  const rejectAlert = async (alerte) => {
+    if (!alerte?.id) return toast.error("ID de l'alerte manquant !");
+    if (alerte.status === "accepté" || alerte.status === "refusé") return;
+
     try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+      if (reportSnap.exists()) await updateDoc(reportRef, { status: "aide refusée" });
+
       await deleteDoc(doc(db, "alertes", alerte.id));
-      setSelectedAlert(null);
-      setCurrentAlert(null);
+      removeAlertWithAnimation(alerte.id);
+
+      await updateDoc(doc(db, "solidaires", user.uid), { status: "disponible" });
+      await updateUserStatus(user.uid, "disponible", true, null);
+
       toast.info("❌ Alerte rejetée !");
     } catch (err) {
       console.error("Erreur rejet :", err);
+      toast.error("❌ Une erreur est survenue lors du rejet.");
+    }
+  };
+
+  // 🔑 Solidaire valide les frais
+  const handleConfirmPricing = async (alerte, montant, fraisAnnules) => {
+    if (!alerte?.reportId) return;
+
+    try {
+      const reportRef = doc(db, "reports", alerte.reportId);
+      const reportSnap = await getDoc(reportRef);
+      if (!reportSnap.exists()) {
+        await deleteDoc(doc(db, "alertes", alerte.id));
+        removeAlertWithAnimation(alerte.id);
+        setAcceptModal({ isOpen: false, alerte: null });
+        toast.error("⚠️ Rapport introuvable. Alerte supprimée.");
+        return;
+      }
+
+      const reportData = reportSnap.data();
+      const finalAmount = fraisAnnules ? 0 : montant;
+
+      await updateDoc(reportRef, {
+        status: "attente séquestre",
+        helperUid: user.uid,
+        helperConfirmed: true,
+        frais: finalAmount,
+        notificationForOwner: `🚨 Solidaire en route ! Montant : ${finalAmount} €`,
+      });
+
+      await updateUserStatus(user.uid, "aide en cours", true, alerte.reportId);
+
+      // Crée le séquestre
+      const escrowResult = await createEscrow(alerte.reportId, finalAmount, setPaymentStatus);
+
+      if (!escrowResult.success) {
+        toast.error("⚠️ Impossible de créer le paiement. Réessayez plus tard.");
+        return;
+      }
+
+      // Si montant 0 ou séquestre créé → ouvrir InProgress
+      if (escrowResult.status === "created" || finalAmount === 0) {
+        setAcceptModal({ isOpen: false, alerte: null });
+        setInProgressModal({ isOpen: true, report: { id: alerte.reportId, ...reportData } });
+        toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
+      } else {
+        // Sinon on garde AcceptModal ouverte jusqu'au paiement réel
+        toast.info("Le sinistré doit maintenant séquestrer le montant.");
+      }
+    } catch (err) {
+      console.error("Erreur confirmation frais :", err);
+      toast.error("❌ Erreur lors de la validation des frais.");
+    }
+  };
+
+  // 🔔 Écoute reports pour InProgressModal
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, "reports"), where("helperUid", "==", user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach((docSnap) => {
+        const report = { id: docSnap.id, ...docSnap.data() };
+
+        // Montant séquestré via Stripe
+        if ((report.escrowStatus === "created" || report.frais === 0) && !inProgressModal.isOpen) {
+          setAcceptModal({ isOpen: false, alerte: null });
+          setInProgressModal({ isOpen: true, report });
+          toast.success("💰 Montant séquestré ! Vous pouvez aller aider le sinistré.");
+        }
+
+        // Alerte rejetée
+        if (report.status === "aide refusée" && report.alertId) {
+          removeAlertWithAnimation(report.alertId);
+        }
+      });
+    });
+
+    return () => unsub();
+  }, [user, inProgressModal.isOpen]);
+
+  const handleReleasePayment = async (reportId) => {
+    await releaseEscrow(reportId, setPaymentStatus);
+    setInProgressModal({ isOpen: false, report: null });
+  };
+
+  const statusColor = (status) => {
+    switch (status) {
+      case "accepté": return "#d1e7dd";
+      case "refusé": return "#f8d7da";
+      default: return "#fff3cd";
     }
   };
 
   return (
-    <>
-      {/* Modals */}
-      <AcceptModal
-        isOpen={!!currentAlert}
-        onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
-        alerte={currentAlert}
-      />
-      <InProgressModal
-        isOpen={!!currentReport}
-        onClose={() => setCurrentReport(null)}
-        report={currentReport}
-        solidaire={user}
-        onComplete={() => setCurrentReport(null)}
-        userPosition={userPosition}
-      />
-      {paymentPending && user.role === "sinistré" && (
-        <PaymentBanner
-          report={paymentPending}
-          onConfirm={() => setPaymentPending(null)}
-        />
-      )}
-      <HelpBanner
-        report={currentReport || null}
-        onComplete={() => setCurrentReport(null)}
-      />
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4 overflow-auto">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+        <h4 className="mb-4 font-semibold text-lg">📢 Mes alertes reçues</h4>
 
-      {/* Liste des alertes pour le solidaire */}
-      {alerts.length > 0 && user.role === "solidaire" && (
-        <ul className="space-y-3">
-          {alerts.map(a => (
-            <li key={a.id} className="p-3 rounded-lg shadow-sm bg-yellow-50">
-              <h5 className="font-medium">
-                🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
-              </h5>
-              <div className="flex gap-2 mt-2">
-                <button
-                  className="px-2 py-1 bg-gray-200 rounded"
-                  onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}
-                >
-                  📍 Voir
-                </button>
-                <button
-                  className="px-2 py-1 bg-green-600 text-white rounded"
-                  onClick={() => acceptAlert(a)}
-                >
-                  ✅ Accepter
-                </button>
-                <button
-                  className="px-2 py-1 bg-red-600 text-white rounded"
-                  onClick={() => rejectAlert(a)}
-                >
-                  ❌ Refuser
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+        <AcceptModal
+          isOpen={acceptModal.isOpen}
+          onClose={() => setAcceptModal({ isOpen: false, alerte: null })}
+          alerte={acceptModal.alerte}
+          onConfirm={handleConfirmPricing}
+        />
+
+        <InProgressModal
+          isOpen={inProgressModal.isOpen}
+          onClose={() => setInProgressModal({ isOpen: false, report: null })}
+          report={inProgressModal.report}
+          solidaire={user}
+          onComplete={handleReleasePayment}
+        />
+
+        <HelpBanner
+          report={inProgressModal.report}
+          onComplete={() => handleReleasePayment(inProgressModal.report?.id)}
+        />
+
+        {alerts.length === 0 ? (
+          <p>Aucune alerte pour l’instant</p>
+        ) : (
+          <ul className="space-y-3">
+            {alerts.map((a) => (
+              <li key={a.id} className="p-3 rounded-lg shadow-sm" style={{ backgroundColor: statusColor(a.status) }}>
+                <h5 className="font-medium">
+                  🚨 {a.ownerName || a.fromUid} a signalé : {a.nature || "Panne"}
+                </h5>
+                <p>📍 À {a.distance || "?"} km de vous</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                    onClick={() => setSelectedAlert(a)}
+                  >
+                    📍 Voir sur la carte
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "green" }}
+                    onClick={() => acceptAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ✅ Accepter
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-white"
+                    style={{ backgroundColor: a.status ? "#6c757d" : "red" }}
+                    onClick={() => rejectAlert(a)}
+                    disabled={a.status === "accepté" || a.status === "refusé"}
+                  >
+                    ❌ Refuser
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

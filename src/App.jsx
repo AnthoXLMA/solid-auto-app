@@ -34,8 +34,8 @@ import ModalHelperList from "./ModalHelperList";
 export default function App() {
   const [user, setUser] = useState(null);
   const [currentPosition, setCurrentPosition] = useState([46.959095, 4.858485]);
+  const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
-  const [solidaires, setSolidaires] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [showReportForm, setShowReportForm] = useState(false);
@@ -55,9 +55,8 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) return setUser(null);
-
       try {
-        const userRef = doc(db, "solidaires", currentUser.uid);
+        const userRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
@@ -67,8 +66,13 @@ export default function App() {
             uid: currentUser.uid,
             email: currentUser.email,
             username: currentUser.displayName || currentUser.email.split("@")[0],
-            materiel: "batterie",
+            materiel: [],
             online: true,
+            points_experience: 0,
+            badges: [],
+            score_global: 0,
+            niveau: "Débutant 🌱",
+            hasSeenFirstPanneModal: false,
           };
           await setDoc(userRef, newUser);
           setUser(newUser);
@@ -82,42 +86,48 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // -------------------- User status --------------------
+  const getUserStatus = (user, activeReport) => {
+    if (!activeReport) return "idle";
+    if (activeReport.ownerUid === user.uid) return "sinistre";
+    if (activeReport.helperUid === user.uid) return "helper";
+    return "idle";
+  };
+  const userStatus = getUserStatus(user, activeReport);
+
   // -------------------- Géolocalisation --------------------
   useEffect(() => {
     if (!navigator.geolocation) {
       toast.warning("⚠️ Géolocalisation non supportée par votre navigateur.");
       return;
     }
-
     const watcher = navigator.geolocation.watchPosition(
       (pos) => setCurrentPosition([pos.coords.latitude, pos.coords.longitude]),
-      (err) => toast.warning("⚠️ Impossible de récupérer votre position."),
+      () => toast.warning("⚠️ Impossible de récupérer votre position."),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-
     return () => navigator.geolocation.clearWatch(watcher);
   }, []);
 
   // -------------------- Online / Offline --------------------
   useEffect(() => {
     if (!user) return;
-    const userRef = doc(db, "solidaires", user.uid);
+    const userRef = doc(db, "users", user.uid);
     updateDoc(userRef, { online: true }).catch(() => {});
     const handleBeforeUnload = () => updateDoc(userRef, { online: false }).catch(() => {});
     window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       updateDoc(userRef, { online: false }).catch(() => {});
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [user]);
 
-  // -------------------- Solidaires & Online --------------------
+  // -------------------- Users & online count --------------------
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "solidaires"), (snapshot) => {
-      const allSolidaires = snapshot.docs.map((doc) => doc.data() || {});
-      setSolidaires(allSolidaires);
-      setOnlineUsers(allSolidaires.filter((s) => s.online).length);
+    const unsub = onSnapshot(collection(db, "users"), (snapshot) => {
+      const allUsers = snapshot.docs.map(doc => doc.data() || {});
+      setUsers(allUsers);
+      setOnlineUsers(allUsers.filter(u => u.online).length);
     });
     return () => unsub();
   }, []);
@@ -126,11 +136,10 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(collection(db, "reports"), (snapshot) => {
-      const allReports = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const allReports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setReports(allReports);
-
       if (activeReport) {
-        const updated = allReports.find((r) => r.id === activeReport.id);
+        const updated = allReports.find(r => r.id === activeReport.id);
         if (updated) setActiveReport(updated);
       }
     });
@@ -141,8 +150,8 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "alertes"), where("toUid", "==", user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setAlerts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(q, snapshot => {
+      setAlerts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
   }, [user]);
@@ -159,7 +168,6 @@ export default function App() {
         status: "en attente",
         timestamp: serverTimestamp(),
       });
-
       const createdReport = { ...payload, id: docRef.id };
       setActiveReport(createdReport);
       setShowHelperList(true);
@@ -172,19 +180,18 @@ export default function App() {
     }
   };
 
-  // -------------------- Envoyer alerte à un solidaire --------------------
-  const onAlertUser = async (solidaire) => {
+  // -------------------- Envoyer alerte à un helper --------------------
+  const onAlertUser = async (targetUser) => {
     if (!activeReport || !activeReport.id || !user) {
       toast.error("❌ Aucune panne active sélectionnée !");
       return;
     }
-
     try {
       await addDoc(collection(db, "alertes"), {
         reportId: activeReport.id,
         fromUid: user.uid,
         fromName: user.username || user.email,
-        toUid: solidaire.uid,
+        toUid: targetUser.uid,
         ownerName: user.username || user.email,
         status: "en attente",
         nature: activeReport.nature || "Panne",
@@ -193,11 +200,11 @@ export default function App() {
 
       await updateDoc(doc(db, "reports", activeReport.id), {
         status: "aide en cours",
-        helperUid: solidaire.uid,
+        helperUid: targetUser.uid,
       });
 
-      setActiveReport(prev => prev ? { ...prev, status: "aide en cours", helperUid: solidaire.uid } : prev);
-      toast.success(`🚨 Alerte envoyée à ${solidaire.username || solidaire.email}`);
+      setActiveReport(prev => prev ? { ...prev, status: "aide en cours", helperUid: targetUser.uid } : prev);
+      toast.success(`🚨 Alerte envoyée à ${targetUser.username || targetUser.email}`);
     } catch (err) {
       console.error("Erreur alerte :", err);
       toast.error("⚠️ Impossible d'envoyer l'alerte.");
@@ -207,7 +214,6 @@ export default function App() {
   // -------------------- Annuler un report --------------------
   const cancelReport = async (reportId) => {
     if (!user) return;
-
     try {
       const reportDoc = await getDoc(doc(db, "reports", reportId));
       if (!reportDoc.exists()) return toast.error("⚠️ Report introuvable.");
@@ -222,30 +228,29 @@ export default function App() {
     }
   };
 
-  // -------------------- Helpers filtrés pour la carte --------------------
-  const filteredSolidaires = useMemo(() => {
-    if (!solidaires || !Array.isArray(solidaires)) return [];
-    return solidaires
-      .filter(s => s.uid !== user?.uid)
-      .map(s => {
-        const pendingAlertsCount = alerts.filter(a => a.toUid === s.uid).length;
-        const alreadyAlerted = s.alerts?.includes(activeReport?.id) || false;
-        const materielArray = Array.isArray(s.materiel) ? s.materiel : [s.materiel].filter(Boolean);
-        const isRelevant = activeReport?.nature && materielArray.some(m => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
+  // -------------------- Filtrer helpers pertinents --------------------
+  const filteredHelpers = useMemo(() => {
+    if (!users || !activeReport) return [];
+    return users
+      .filter(u => u.uid !== user?.uid)
+      .map(u => {
+        const materielArray = Array.isArray(u.materiel) ? u.materiel : [u.materiel].filter(Boolean);
+        const isRelevant = activeReport.nature && materielArray.some(m => m.toLowerCase().includes(activeReport.nature.toLowerCase()));
+        const alreadyAlerted = alerts.some(a => a.toUid === u.uid && a.reportId === activeReport.id);
         let status = "irrelevant";
         if (alreadyAlerted) status = "alerted";
         else if (isRelevant) status = "relevant";
-        if (pendingAlertsCount > 0) status = "alerted";
-        return { ...s, alreadyAlerted, pendingAlertsCount, status };
+        return { ...u, status, alreadyAlerted };
       });
-  }, [solidaires, activeReport, alerts, user]);
+  }, [users, activeReport, alerts, user]);
 
+  // -------------------- Render --------------------
   if (!user) return <Auth setUser={setUser} />;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-screen relative bg-gray-100">
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative">
+      <header className="bg-blue-600 text-white p-4 flex justify-between items-center shadow relative z-10">
         <h1 className="text-xl font-bold">Bienvenue {user.username || user.email}</h1>
         <button
           onClick={() => setShowProfileForm(prev => !prev)}
@@ -256,11 +261,11 @@ export default function App() {
       </header>
 
       {/* Main */}
-      <main className="flex-1 relative bg-gray-100">
+      <main className="flex-1 relative">
         {page === "map" && (
           <MapView
             reports={reports}
-            solidaires={filteredSolidaires}
+            solidaires={filteredHelpers}
             alerts={alerts}
             userPosition={currentPosition}
             onPositionChange={setCurrentPosition}
@@ -270,7 +275,9 @@ export default function App() {
             cancelReport={cancelReport}
             currentUserUid={user.uid}
             ref={mapRef}
+            style={{ height: "100%", width: "100%" }}
           />
+
         )}
 
         {page === "dashboard" && <Dashboard user={user} />}
@@ -290,11 +297,12 @@ export default function App() {
                 longitude: updatedUser.longitude || -1.4746,
               };
               setUser(sanitizedUser);
-              updateDoc(doc(db, "solidaires", sanitizedUser.uid), sanitizedUser);
+              updateDoc(doc(db, "users", sanitizedUser.uid), sanitizedUser);
             }}
           />
         )}
 
+        {/* Modals */}
         {showReportForm && (
           <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[70%] overflow-y-auto z-40">
             <ReportForm
@@ -310,7 +318,7 @@ export default function App() {
         {showPanneModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-lg p-4 w-[90%] max-w-md max-h-[80%] overflow-y-auto">
-              <UserReports userReports={userReports} users={solidaires} cancelReport={cancelReport} />
+              <UserReports userReports={userReports} users={users} cancelReport={cancelReport} />
               <button onClick={() => setShowPanneModal(false)} className="mt-4 w-full bg-gray-200 py-2 rounded-lg">Fermer</button>
             </div>
           </div>
@@ -318,7 +326,7 @@ export default function App() {
         {showChat && <Chat user={user} onClose={() => setShowChat(false)} />}
         {showHelperList && (
           <ModalHelperList
-            helpers={filteredSolidaires}
+            helpers={filteredHelpers}
             userPosition={currentPosition}
             activeReport={activeReport}
             setShowHelperList={setShowHelperList}
