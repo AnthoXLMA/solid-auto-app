@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { calculateFees } from "./utils/calculateFees";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "./firebase";
+
 
 export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStartRepair }) {
   const distanceKm = alerte?.distance || 0;
@@ -14,20 +17,26 @@ export default function AcceptModal({ isOpen, onClose, alerte, onConfirm, onStar
   if (!isOpen || !alerte) return null;
 
   const handleConfirm = async (fraisAnnules) => {
-    if (loading) return;
-    setLoading(true);
+  if (loading) return;
+  setLoading(true);
 
-    try {
-      const finalAmount = fraisAnnules ? 0 : Math.max(0, montant); // sécurité
-      await onConfirm?.(alerte, finalAmount, fraisAnnules);
-      onClose?.();
-      if (onStartRepair) onStartRepair({ ...alerte, frais: finalAmount, helperConfirmed: true });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const finalAmount = fraisAnnules ? 0 : Math.max(0, montant);
+    await onConfirm?.(alerte, finalAmount, fraisAnnules);
+
+    // ⚡ Mise à jour Firestore
+    const reportRef = doc(db, "reports", alerte.reportId);
+    await updateDoc(reportRef, { frais: finalAmount });
+
+    onClose?.();
+    if (onStartRepair) onStartRepair({ ...alerte, frais: finalAmount, helperConfirmed: true });
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">

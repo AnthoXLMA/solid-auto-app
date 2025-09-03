@@ -65,39 +65,27 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
       needsTow: activeReport.needsTow || false,
       message: activeReport.message || "",
       timestamp: serverTimestamp(),
-      status: "en attente"
+      status: "en attente",
     });
 
-    console.log("Alerte créée", docRef.id, "pour solidaire:", helper.uid);
-
-    // ⚡ Ajouter l’alerte localement
     if (onNewAlert) {
       onNewAlert({
         id: docRef.id,
-        reportId: activeReport.id,
+        ...activeReport,
         toUid: helper.uid,
-        fromUid: activeReport.ownerUid || "sinistré",
-        ownerName: activeReport.ownerName || "Sinistré",
-        nature: activeReport.nature || "Panne",
-        subType: activeReport.subType || "",
-        incident: activeReport.incident || "",
-        environment: activeReport.environment || "",
-        needsTow: activeReport.needsTow || false,
-        message: activeReport.message || "",
-        timestamp: new Date(),
+        fromUid: activeReport.ownerUid,
         status: "en attente"
       });
     }
 
-
     toast.success(`⚡ Alerte envoyée à ${helper.name}`);
-    onClose();
-
+    // onClose(); <-- on laisse modal ouverte
   } catch (err) {
-    console.error("Erreur lors de l’envoi de l’alerte :", err);
+    console.error(err);
     toast.error("❌ Impossible d’envoyer l’alerte");
   }
 };
+
 
 
 

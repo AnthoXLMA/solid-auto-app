@@ -62,16 +62,22 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
 
   // 🔹 Accepter une alerte (solidaire)
   const acceptAlert = async (alerte) => {
-    if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
-    try {
-      await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
-      setAcceptModal({ isOpen: true, alerte });
-      toast.success("✅ Alerte acceptée !");
-    } catch (err) {
-      console.error("Erreur acceptation :", err);
-      toast.error("❌ Une erreur est survenue lors de l’acceptation.");
-    }
-  };
+  if (!alerte?.id || ["accepté", "refusé"].includes(alerte.status)) return;
+  try {
+    await updateDoc(doc(db, "alertes", alerte.id), { status: "accepté" });
+
+    // ⚡ Mettre helperConfirmed = true dans le report
+    const reportRef = doc(db, "reports", alerte.reportId);
+    await updateDoc(reportRef, { helperConfirmed: true });
+
+    setAcceptModal({ isOpen: true, alerte });
+    toast.success("✅ Alerte acceptée !");
+  } catch (err) {
+    console.error("Erreur acceptation :", err);
+    toast.error("❌ Une erreur est survenue lors de l’acceptation.");
+  }
+};
+
 
   // 🔹 Rejeter une alerte (solidaire)
   const rejectAlert = async (alerte) => {

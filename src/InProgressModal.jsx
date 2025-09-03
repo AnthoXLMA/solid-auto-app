@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getDistanceKm } from "./utils/distance";
 import PaymentBanner from "./PaymentBanner";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "./firebase";
+
 
 export default function InProgressModal({
   isOpen,
@@ -33,12 +36,15 @@ export default function InProgressModal({
     return () => clearInterval(interval);
   }, [isOpen, userPosition, report]);
 
-  const handleArrived = () => {
-    if (!arrived) {
-      setArrived(true);
-      toast.info("✅ Arrivée confirmée");
-    }
-  };
+  const handleArrived = async () => {
+  if (!arrived) {
+    setArrived(true);
+    toast.info("✅ Arrivée confirmée");
+
+    await updateDoc(doc(db, "reports", report.id), { arrivedAt: new Date().toISOString() });
+  }
+};
+
 
   const handleComplete = async () => {
     if (!arrived) {
