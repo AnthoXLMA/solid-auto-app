@@ -5,9 +5,9 @@ import { db } from "./firebase";
 import { toast } from "react-toastify";
 
 export default function ModalHelperList({
-  helpers,
+  helpers = [],  // <-- valeur par défaut
   onClose,
-  userPosition,
+  userPosition = [0, 0], // <-- fallback
   activeReport,
   onNewAlert,
   setShowHelperList,
@@ -20,7 +20,6 @@ export default function ModalHelperList({
     h => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
-  // Fetch reviews
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -42,49 +41,36 @@ export default function ModalHelperList({
 
   const currentHelper = validHelpers[currentIndex];
 
-  // ✅ Forcer distance à être un number
-  const rawDistance = getDistanceKm(
-    userPosition?.[0],
-    userPosition?.[1],
+  const distance = Number(getDistanceKm(
+    userPosition?.[0] || 0,
+    userPosition?.[1] || 0,
     currentHelper?.latitude,
     currentHelper?.longitude
-  );
-  const distance = Number(rawDistance) || 0;
+  )) || 0;
 
   const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
   const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
 
-const handleAlert = async helper => {
-  if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
+  const handleAlert = async (helper) => {
+  if (!activeReport || !activeReport.id) {
+    toast.error("❌ Aucune panne active sélectionnée !");
+    return;
+  }
 
   try {
-    // création alerte
-    const docRef = await addDoc(collection(db, "alertes"), {
-      reportId: activeReport.id,
+    await addDoc(collection(db, "alertes"), {
+      reportId: activeReport.id,   // ✅ sûr maintenant
       toUid: helper.uid,
       fromUid: activeReport.ownerUid || "sinistré",
       ownerName: activeReport.ownerName || "Sinistré",
       nature: activeReport.nature || "Panne",
-      subType: activeReport.subType || "",
-      incident: activeReport.incident || "",
-      environment: activeReport.environment || "",
-      needsTow: activeReport.needsTow || false,
-      message: activeReport.message || "",
       timestamp: serverTimestamp(),
       status: "en attente",
-      handled: false, // <-- nouveau champ pour savoir si le solidaire a traité l'alerte
+      handled: false,
     });
 
-    // update report avec helperUid
-    if (activeReport?.id) {
-      await updateDoc(doc(db, "reports", activeReport.id), { helperUid: helper.uid });
-    }
-
-    // fermer le modal sinistré
     setShowHelperList(false);
     onClose?.();
-
-    // pas de toast côté sinistré
   } catch (err) {
     console.error(err);
     toast.error("❌ Impossible d’envoyer l’alerte");
