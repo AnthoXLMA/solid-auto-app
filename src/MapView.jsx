@@ -1,3 +1,4 @@
+// --- MapView.jsx ---
 import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -59,11 +60,12 @@ const getSolidaireIconWithBadge = (status, pendingAlertsCount) => {
   });
 };
 
+// --- Helper notifications ---
 const alertHelper = (helper) => {
   toast.info(`⚡ Alerte envoyée à ${helper.name}`);
 };
 
-// === Composants utilitaires ===
+// --- Utilitaires Map ---
 function SetViewOnUser({ position }) {
   const map = useMap();
   useEffect(() => {
@@ -92,11 +94,12 @@ function HelperBanner({ activeReport, solidaires, userPosition }) {
   const distanceRaw =
     helper.latitude != null &&
     helper.longitude != null &&
-    userPosition?.length === 2
+    Array.isArray(userPosition) &&
+    userPosition.length === 2
       ? getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
       : 0;
 
-  const distance = typeof distanceRaw === "number" ? distanceRaw : 0;
+  const distance = Number(distanceRaw) || 0;
 
   return (
     <div
@@ -122,7 +125,7 @@ function HelperBanner({ activeReport, solidaires, userPosition }) {
   );
 }
 
-// === Composant principal MapView ===
+// --- MapView principal ---
 const MapView = forwardRef(
   (
     {
@@ -150,7 +153,7 @@ const MapView = forwardRef(
 
     const [isAcceptOpen, setIsAcceptOpen] = useState(false);
     const [currentReport, setCurrentReport] = useState(null);
-    const [distanceToHelper, setDistanceToHelper] = useState(null);
+    const [distanceToHelper, setDistanceToHelper] = useState(0);
     const [currentUser, setCurrentUser] = useState(
       solidaires.find((s) => s.uid === currentUserUid) || null
     );
@@ -166,7 +169,7 @@ const MapView = forwardRef(
     const [reviewsMap, setReviewsMap] = useState({});
     const [showInProgress, setShowInProgress] = useState(false);
 
-    // --- Fetch avis ---
+    // --- Fetch reviews ---
     useEffect(() => {
       const fetchReviews = async () => {
         const map = {};
@@ -186,35 +189,26 @@ const MapView = forwardRef(
       fetchReviews();
     }, [filteredSolidairesWithCoords]);
 
-    // --- Suivi temps réel du report actif ---
+    // --- Suivi report actif ---
     useEffect(() => {
-  if (!activeReport) return;
-  const reportRef = doc(db, "reports", activeReport.id);
-  const unsub = onSnapshot(reportRef, (docSnap) => {
-    if (!docSnap.exists()) return cancelReport(activeReport.id);
-    const data = docSnap.data();
+      if (!activeReport) return;
+      const reportRef = doc(db, "reports", activeReport.id);
+      const unsub = onSnapshot(reportRef, (docSnap) => {
+        if (!docSnap.exists()) return cancelReport(activeReport.id);
+        const data = docSnap.data();
+        setCurrentReport({ ...activeReport, ...data });
 
-    // Met à jour currentReport pour affichage général
-    setCurrentReport({ ...activeReport, ...data });
+        if (data.status === "attente séquestre" && data.helperConfirmed && !showInProgress) {
+          setShowInProgress(true);
+        }
 
-    // 🔹 Ouvre InProgressModal côté solidaire
-    if (
-      data.status === "attente séquestre" &&
-      data.helperConfirmed &&
-      !showInProgress
-    ) {
-      setShowInProgress(true);
-    }
-
-    // Notification pour le sinistré
-    if (data.notificationForOwner) {
-      toast.info(data.notificationForOwner);
-      updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
-    }
-  });
-  return () => unsub();
-}, [activeReport, cancelReport, showInProgress]);
-
+        if (data.notificationForOwner) {
+          toast.info(data.notificationForOwner);
+          updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
+        }
+      });
+      return () => unsub();
+    }, [activeReport, cancelReport, showInProgress]);
 
     // --- Calcul distance helper ---
     useEffect(() => {
@@ -222,41 +216,20 @@ const MapView = forwardRef(
       const interval = setInterval(() => {
         const helper = solidaires.find((s) => s.uid === currentReport.helperUid);
         if (!helper || typeof helper.latitude !== "number" || typeof helper.longitude !== "number") return;
-        const dist = getDistanceKm(
-          userPosition[0],
-          userPosition[1],
-          helper.latitude,
-          helper.longitude
-        );
-        setDistanceToHelper(typeof dist === "number" ? dist : 0);
+        const dist = Number(
+          getDistanceKm(userPosition[0], userPosition[1], helper.latitude, helper.longitude)
+        ) || 0;
+        setDistanceToHelper(dist);
       }, 5000);
       return () => clearInterval(interval);
     }, [currentReport, solidaires, userPosition]);
 
-    // --- Notification sinistré ---
-    useEffect(() => {
-      if (!currentUserUid) return;
-      const q = collection(db, "reports");
-      const unsub = onSnapshot(q, (snapshot) => {
-        snapshot.docs.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (data.ownerUid === currentUserUid && data.notificationForOwner) {
-            toast.info(data.notificationForOwner);
-            updateDoc(doc(db, "reports", docSnap.id), { notificationForOwner: null });
-          }
-        });
-      });
-      return () => unsub();
-    }, [currentUserUid]);
+    if (!Array.isArray(userPosition) || userPosition.length < 2)
+      return <div>📍 Localisation en cours...</div>;
 
-    if (!userPosition || userPosition.length < 2) return <div>📍 Localisation en cours...</div>;
-
-    let alertLocation = null;
-    if (selectedAlert) {
-      const report = reports.find((r) => r.id === selectedAlert.reportId);
-      if (report && typeof report.latitude === "number" && typeof report.longitude === "number")
-        alertLocation = { latitude: report.latitude, longitude: report.longitude };
-    }
+    const alertLocation = selectedAlert
+      ? reports.find((r) => r.id === selectedAlert.reportId)
+      : null;
 
     const isSinistre = currentUser?.role !== "solidaire";
     const helperForPayment =
@@ -264,9 +237,9 @@ const MapView = forwardRef(
 
     return (
       <>
-        {/* --- Modals et banners au-dessus --- */}
+        {/* Modals */}
         <AcceptModal
-          isOpen={isAcceptOpen}
+          isOpen={isAcceptOpen && !!currentReport?.id && !!currentReport?.helperUid}
           onClose={() => setIsAcceptOpen(false)}
           alerte={currentReport}
           onConfirm={(report) => {
@@ -275,18 +248,24 @@ const MapView = forwardRef(
           }}
         />
         {isSinistre && currentReport?.helperConfirmed && currentReport.helperUid && (
+          <PaymentBanner
+            report={currentReport}
+            solidaire={helperForPayment}
+            currentUser={{ uid: currentUserUid }}
+            isSinistre
+          />
+        )}
+        {isSinistre && currentReport?.helperConfirmed && currentReport.helperUid && (
           <ActiveRepairModal
             report={currentReport}
-            solidaire={filteredSolidairesWithCoords.find(
-              (s) => s.uid === currentReport.helperUid
-            ) || null}
+            solidaire={filteredSolidairesWithCoords.find((s) => s.uid === currentReport.helperUid) || null}
             userPosition={userPosition}
             onComplete={() => setCurrentReport(null)}
           />
         )}
-        {!isSinistre && showInProgress && currentReport && (
+        {!isSinistre && showInProgress && currentReport?.helperConfirmed && currentReport.helperUid && (
           <InProgressModal
-            isOpen={true}
+            isOpen
             onClose={() => setShowInProgress(false)}
             report={currentReport}
             solidaire={currentUser}
@@ -302,33 +281,18 @@ const MapView = forwardRef(
             activeReport={activeReport}
             onAlert={(helper) => {
               if (!activeReport)
-                return toast.error(
-                  "Vous devez avoir un signalement actif pour alerter un solidaire !"
-                );
+                return toast.error("Vous devez avoir un signalement actif pour alerter un solidaire !");
               alertHelper(helper);
               setShowHelperList(false);
             }}
+            setShowHelperList={setShowHelperList}
             onClose={() => setShowHelperList(false)}
           />
         )}
-        {isSinistre && currentReport?.helperConfirmed && helperForPayment && (
-          <PaymentBanner
-            report={currentReport}
-            solidaire={helperForPayment}
-            currentUser={{ uid: currentUserUid }}
-            isSinistre={true}
-          />
-        )}
 
-        {/* --- Map en arrière-plan --- */}
+        {/* Map */}
         <div className="relative w-full h-full z-0">
-          <MapContainer
-            center={userPosition}
-            zoom={13}
-            style={{ height: "100%", width: "100%" }}
-            ref={mapRef}
-            scrollWheelZoom
-          >
+          <MapContainer center={userPosition} zoom={13} style={{ height: "100%", width: "100%" }} ref={mapRef} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -336,11 +300,7 @@ const MapView = forwardRef(
             <SetViewOnUser position={userPosition} />
             {alertLocation && <FlyToLocation alert={alertLocation} />}
             {isSinistre && currentReport?.helperConfirmed && (
-              <HelperBanner
-                activeReport={currentReport}
-                solidaires={filteredSolidairesWithCoords}
-                userPosition={userPosition}
-              />
+              <HelperBanner activeReport={currentReport} solidaires={filteredSolidairesWithCoords} userPosition={userPosition} />
             )}
 
             <Marker position={userPosition} icon={currentUserIcon}>
@@ -348,71 +308,49 @@ const MapView = forwardRef(
             </Marker>
 
             {reports.map((report) => (
-              <Marker
-                key={report.id}
-                position={[report.latitude, report.longitude]}
-                icon={reportIcon}
-                eventHandlers={{ click: () => onReportClick(report) }}
-              >
+              <Marker key={report.id} position={[report.latitude, report.longitude]} icon={reportIcon} eventHandlers={{ click: () => onReportClick(report) }}>
                 <Popup>
                   <strong>⚠️ Panne :</strong> {report.nature} <br />
-                  {report.ownerUid === currentUserUid && (
-                    <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>
-                  )}
+                  {report.ownerUid === currentUserUid && <button onClick={() => cancelReport(report.id)}>❌ Annuler</button>}
                 </Popup>
               </Marker>
             ))}
 
             {filteredSolidairesWithCoords.map((s) => {
               const isOffline = !s.online;
-              const alertForSolidaire =
-                currentReport && alerts
-                  ? alerts.find((a) => a.reportId === currentReport.id && a.toUid === s.uid)
-                  : null;
+              const alertForSolidaire = currentReport && alerts
+                ? alerts.find((a) => a.reportId === currentReport.id && a.toUid === s.uid)
+                : null;
 
               let status = "available";
               if (isOffline) status = "offline";
               else if (currentReport?.helperUid === s.uid) {
-                if (currentReport.helperConfirmed && currentReport.status === "aide en cours")
-                  status = "busy";
+                if (currentReport.helperConfirmed && currentReport.status === "aide en cours") status = "busy";
                 else if (!currentReport.helperConfirmed && alertForSolidaire) status = "alerted";
               }
 
-              const distanceRaw =
-                s.latitude != null && s.longitude != null && userPosition?.length === 2
+              const distance = Number(
+                s.latitude != null && s.longitude != null && Array.isArray(userPosition) && userPosition.length === 2
                   ? getDistanceKm(userPosition[0], userPosition[1], s.latitude, s.longitude)
-                  : 0;
-              const distance = typeof distanceRaw === "number" ? distanceRaw : 0;
+                  : 0
+              ) || 0;
 
               const alertCount = alerts?.filter((a) => a.toUid === s.uid).length || 0;
 
               return (
-                <Marker
-                  key={s.uid}
-                  position={[s.latitude, s.longitude]}
-                  icon={getSolidaireIconWithBadge(status, alertCount)}
-                >
+                <Marker key={s.uid} position={[s.latitude, s.longitude]} icon={getSolidaireIconWithBadge(status, alertCount)}>
                   <Popup>
                     <strong>👤 {s.name}</strong> <br />
-                    {`⭐ Note moyenne : ${reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} (${
-                      reviewsMap[s.uid]?.count || 0
-                    } avis)`}{" "}
-                    <br />
+                    {`⭐ Note moyenne : ${reviewsMap[s.uid]?.averageNote?.toFixed(1) || "Pas encore de note"} (${reviewsMap[s.uid]?.count || 0} avis)`} <br />
                     Rôle : {s.role?.replace(/_/g, " ") || "Non spécifié"} <br />
-                    Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"}{" "}
-                    <br />
+                    Matériel : {Array.isArray(s.materiel) ? s.materiel.join(", ") : s.materiel || "Non spécifié"} <br />
                     📏 Distance : {distance.toFixed(1)} km <br />
                     {status === "available" && "✅ Disponible"}
                     {status === "offline" && "⚪ Indisponible"}
                     {status === "alerted" && "⏳ En attente de réponse"}
                     {status === "busy" && "⏳ Aide en cours"}
                     {status === "available" && s.uid !== currentUserUid && (
-                      <button
-                        onClick={() => {
-                          onAlertUser(s);
-                          toast.info(`⚡ Alerte envoyée à ${s.name}`);
-                        }}
-                      >
+                      <button onClick={() => { onAlertUser(s); toast.info(`⚡ Alerte envoyée à ${s.name}`); }}>
                         ⚡ Alerter
                       </button>
                     )}
