@@ -4,14 +4,22 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp } from "fire
 import { db } from "./firebase";
 import { toast } from "react-toastify";
 
-export default function ModalHelperList({ helpers, onClose, userPosition, activeReport, onNewAlert }) {
+export default function ModalHelperList({
+  helpers,
+  onClose,
+  userPosition,
+  activeReport,
+  onNewAlert,
+  setShowHelperList
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [reviewsMap, setReviewsMap] = useState({}); // { [uid]: { averageNote: 4.5, count: 3 } }
+  const [reviewsMap, setReviewsMap] = useState({});
 
   const validHelpers = helpers.filter(
     (h) => typeof h.latitude === "number" && typeof h.longitude === "number"
   );
 
+  // --- Fetch avis pour chaque helper ---
   useEffect(() => {
     const fetchReviews = async () => {
       const map = {};
@@ -34,12 +42,14 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
   if (!validHelpers || validHelpers.length === 0) return null;
 
   const currentHelper = validHelpers[currentIndex];
-  const distance = getDistanceKm(
-    userPosition[0],
-    userPosition[1],
-    currentHelper.latitude,
-    currentHelper.longitude
-  );
+
+  // --- Calcul distance sécurisé ---
+  const distanceRaw =
+    typeof currentHelper.latitude === "number" &&
+    typeof currentHelper.longitude === "number"
+      ? getDistanceKm(userPosition[0], userPosition[1], currentHelper.latitude, currentHelper.longitude)
+      : 0;
+  const distance = Number(distanceRaw) || 0;
 
   const handlePrev = () => {
     setCurrentIndex((prev) => (prev === 0 ? validHelpers.length - 1 : prev - 1));
@@ -49,27 +59,27 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
     setCurrentIndex((prev) => (prev === validHelpers.length - 1 ? 0 : prev + 1));
   };
 
+  // --- Création d’une alerte Firestore et update parent ---
   const handleAlert = async (helper) => {
-  if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
+    if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
-  try {
-    const docRef = await addDoc(collection(db, "alertes"), {
-      reportId: activeReport.id,
-      toUid: helper.uid,
-      fromUid: activeReport.ownerUid || "sinistré",
-      ownerName: activeReport.ownerName || "Sinistré",
-      nature: activeReport.nature || "Panne",
-      subType: activeReport.subType || "",
-      incident: activeReport.incident || "",
-      environment: activeReport.environment || "",
-      needsTow: activeReport.needsTow || false,
-      message: activeReport.message || "",
-      timestamp: serverTimestamp(),
-      status: "en attente",
-    });
+    try {
+      const docRef = await addDoc(collection(db, "alertes"), {
+        reportId: activeReport.id,
+        toUid: helper.uid,
+        fromUid: activeReport.ownerUid || "sinistré",
+        ownerName: activeReport.ownerName || "Sinistré",
+        nature: activeReport.nature || "Panne",
+        subType: activeReport.subType || "",
+        incident: activeReport.incident || "",
+        environment: activeReport.environment || "",
+        needsTow: activeReport.needsTow || false,
+        message: activeReport.message || "",
+        timestamp: serverTimestamp(),
+        status: "en attente",
+      });
 
-    if (onNewAlert) {
-      onNewAlert({
+      onNewAlert?.({
         id: docRef.id,
         reportId: activeReport.id,
         toUid: helper.uid,
@@ -81,21 +91,19 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
         environment: activeReport.environment,
         needsTow: activeReport.needsTow,
         message: activeReport.message,
+        timestamp: new Date(),
         status: "en attente",
-        timestamp: new Date()  // on peut mettre serverTimestamp() mais côté client c'est pratique
       });
+
+      setShowHelperList(false);
+      onClose?.();
+
+      toast.success(`⚡ Alerte envoyée à ${helper.name}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("❌ Impossible d’envoyer l’alerte");
     }
-
-    toast.success(`⚡ Alerte envoyée à ${helper.name}`);
-    // onClose(); <-- on laisse modal ouverte
-  } catch (err) {
-    console.error(err);
-    toast.error("❌ Impossible d’envoyer l’alerte");
-  }
-};
-
-
-
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
@@ -105,23 +113,18 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
         <div className="flex items-center justify-between gap-2">
           <button onClick={handlePrev} className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300">←</button>
 
-          <div className="flex-1 p-4 border rounded-2xl shadow flex flex-col items-center
-                          max-h-[400px] w-full overflow-y-auto">
+          <div className="flex-1 p-4 border rounded-2xl shadow flex flex-col items-center max-h-[400px] w-full overflow-y-auto">
             <div className="font-medium text-lg text-center">{currentHelper.name}</div>
-
             <div className="text-sm text-gray-500 text-center mt-1">
               🏷 Rôle : {currentHelper.role ? currentHelper.role.replace(/_/g, " ") : "Non spécifié"}
             </div>
-
             <div className="text-sm text-gray-500 text-center mt-1">
               ⭐ Note : {reviewsMap[currentHelper.uid]?.averageNote?.toFixed(1) || "N/A"} ({reviewsMap[currentHelper.uid]?.count || 0} avis)
             </div>
-
             <div className="text-sm text-gray-500 mt-2 text-center">
               Matériel : {Array.isArray(currentHelper.materiel) ? currentHelper.materiel.join(", ") : currentHelper.materiel || "N/A"}
             </div>
-
-            <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance} km</div>
+            <div className="text-sm text-gray-400 mt-1 text-center">Distance: {distance.toFixed(1)} km</div>
 
             <div className="mt-3 text-left text-gray-600 text-sm w-full">
               <p><strong>Panne :</strong> {activeReport?.nature || "N/A"}</p>
@@ -129,9 +132,6 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
               {activeReport?.incident && <p><strong>Incident :</strong> {activeReport.incident}</p>}
               {activeReport?.environment && <p><strong>Environnement :</strong> {activeReport.environment}</p>}
               {activeReport?.needsTow && <p><strong>Remorquage nécessaire</strong></p>}
-              {activeReport?.date && <p><strong>Date :</strong> {activeReport.date}</p>}
-              {activeReport?.time && <p><strong>Heure :</strong> {activeReport.time}</p>}
-              {activeReport?.message && <p><strong>Message :</strong> {activeReport.message}</p>}
             </div>
 
             <button
@@ -147,7 +147,7 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
           <button onClick={handleNext} className="text-2xl font-bold px-4 py-2 bg-gray-200 rounded-full hover:bg-gray-300">→</button>
         </div>
 
-        <button onClick={onClose} className="mt-4 w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Fermer</button>
+        <button onClick={() => { setShowHelperList(false); onClose?.(); }} className="mt-4 w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Fermer</button>
       </div>
     </div>
   );
