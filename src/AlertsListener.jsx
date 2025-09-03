@@ -100,23 +100,24 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, i
   const content = (
     <>
       <AcceptModal
-        isOpen={acceptModal.isOpen}
-        onClose={() => {
-          setAcceptModal({ isOpen: false, alerte: null });
-          setSelectedAlert(null);
-        }}
-        alerte={acceptModal.alerte}
-        onConfirm={() => {}}
-      />
+      isOpen={acceptModal.isOpen && acceptModal.alerte}
+      onClose={() => {
+        setAcceptModal({ isOpen: false, alerte: null });
+        setSelectedAlert(null);
+      }}
+      alerte={acceptModal.alerte}
+      onConfirm={() => {}}
+    />
 
       <InProgressModal
-        isOpen={inProgressModal.isOpen}
+        isOpen={inProgressModal.isOpen && inProgressModal.report}
         onClose={() => setInProgressModal({ isOpen: false, report: null })}
         report={inProgressModal.report}
         solidaire={user}
         onComplete={() => setInProgressModal({ isOpen: false, report: null })}
         userPosition={userPosition}
       />
+
 
       {paymentPending && user.role === "sinistré" && (
         <PaymentBanner report={paymentPending} onConfirm={() => setPaymentPending(null)} />

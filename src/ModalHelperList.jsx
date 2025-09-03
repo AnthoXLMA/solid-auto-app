@@ -71,10 +71,18 @@ export default function ModalHelperList({ helpers, onClose, userPosition, active
     if (onNewAlert) {
       onNewAlert({
         id: docRef.id,
-        ...activeReport,
+        reportId: activeReport.id,
         toUid: helper.uid,
         fromUid: activeReport.ownerUid,
-        status: "en attente"
+        ownerName: activeReport.ownerName,
+        nature: activeReport.nature,
+        subType: activeReport.subType,
+        incident: activeReport.incident,
+        environment: activeReport.environment,
+        needsTow: activeReport.needsTow,
+        message: activeReport.message,
+        status: "en attente",
+        timestamp: new Date()  // on peut mettre serverTimestamp() mais côté client c'est pratique
       });
     }
 
