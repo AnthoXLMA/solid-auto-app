@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getDistanceKm } from "./utils/distance";
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "./firebase";
 import { toast } from "react-toastify";
 
@@ -10,7 +10,8 @@ export default function ModalHelperList({
   userPosition,
   activeReport,
   onNewAlert,
-  setShowHelperList
+  setShowHelperList,
+  setSelectedAlert
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewsMap, setReviewsMap] = useState({});
@@ -94,6 +95,29 @@ export default function ModalHelperList({
         timestamp: new Date(),
         status: "en attente",
       });
+
+      if (activeReport?.id) {
+        await updateDoc(doc(db, "reports", activeReport.id), {
+          helperUid: helper.uid
+        });
+      }
+
+
+      // setSelectedAlert?.({
+      //   id: docRef.id,
+      //   reportId: activeReport.id,
+      //   toUid: helper.uid,
+      //   fromUid: activeReport.ownerUid,
+      //   ownerName: activeReport.ownerName,
+      //   nature: activeReport.nature,
+      //   subType: activeReport.subType,
+      //   incident: activeReport.incident,
+      //   environment: activeReport.environment,
+      //   needsTow: activeReport.needsTow,
+      //   message: activeReport.message,
+      //   timestamp: new Date(),
+      //   status: "en attente",
+      // });
 
       setShowHelperList(false);
       onClose?.();
