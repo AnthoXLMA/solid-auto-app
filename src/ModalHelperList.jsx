@@ -54,60 +54,43 @@ export default function ModalHelperList({
   const handlePrev = () => setCurrentIndex(prev => prev === 0 ? validHelpers.length - 1 : prev - 1);
   const handleNext = () => setCurrentIndex(prev => prev === validHelpers.length - 1 ? 0 : prev + 1);
 
-  const handleAlert = async helper => {
-    if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
+const handleAlert = async helper => {
+  if (!activeReport) return toast.error("Vous devez avoir un signalement actif !");
 
-    try {
-      // 1️⃣ Création alerte
-      const docRef = await addDoc(collection(db, "alertes"), {
-        reportId: activeReport.id,
-        toUid: helper.uid,
-        fromUid: activeReport.ownerUid || "sinistré",
-        ownerName: activeReport.ownerName || "Sinistré",
-        nature: activeReport.nature || "Panne",
-        subType: activeReport.subType || "",
-        incident: activeReport.incident || "",
-        environment: activeReport.environment || "",
-        needsTow: activeReport.needsTow || false,
-        message: activeReport.message || "",
-        timestamp: serverTimestamp(),
-        status: "en attente",
-      });
+  try {
+    // création alerte
+    const docRef = await addDoc(collection(db, "alertes"), {
+      reportId: activeReport.id,
+      toUid: helper.uid,
+      fromUid: activeReport.ownerUid || "sinistré",
+      ownerName: activeReport.ownerName || "Sinistré",
+      nature: activeReport.nature || "Panne",
+      subType: activeReport.subType || "",
+      incident: activeReport.incident || "",
+      environment: activeReport.environment || "",
+      needsTow: activeReport.needsTow || false,
+      message: activeReport.message || "",
+      timestamp: serverTimestamp(),
+      status: "en attente",
+      handled: false, // <-- nouveau champ pour savoir si le solidaire a traité l'alerte
+    });
 
-      // 2️⃣ Mise à jour report avec helperUid
-      if (activeReport?.id) {
-        await updateDoc(doc(db, "reports", activeReport.id), { helperUid: helper.uid });
-      }
-
-      // 3️⃣ Mettre à jour parent/solidaire
-      const newAlert = {
-        id: docRef.id,
-        reportId: activeReport.id,
-        toUid: helper.uid,
-        fromUid: activeReport.ownerUid,
-        ownerName: activeReport.ownerName,
-        nature: activeReport.nature,
-        subType: activeReport.subType,
-        incident: activeReport.incident,
-        environment: activeReport.environment,
-        needsTow: activeReport.needsTow,
-        message: activeReport.message,
-        timestamp: new Date(),
-        status: "en attente",
-      };
-
-      onNewAlert?.(newAlert);
-      setSelectedAlert?.(newAlert);
-
-      setShowHelperList(false);
-      onClose?.();
-
-      toast.success(`⚡ Alerte envoyée à ${helper.name}`);
-    } catch (err) {
-      console.error(err);
-      toast.error("❌ Impossible d’envoyer l’alerte");
+    // update report avec helperUid
+    if (activeReport?.id) {
+      await updateDoc(doc(db, "reports", activeReport.id), { helperUid: helper.uid });
     }
-  };
+
+    // fermer le modal sinistré
+    setShowHelperList(false);
+    onClose?.();
+
+    // pas de toast côté sinistré
+  } catch (err) {
+    console.error(err);
+    toast.error("❌ Impossible d’envoyer l’alerte");
+  }
+};
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">

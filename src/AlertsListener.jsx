@@ -33,16 +33,17 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
 
       if (onNewAlert && sorted.length > 0) onNewAlert(sorted);
 
-      // ⚡ Pour le solidaire : ouvrir automatiquement la modal sur la première alerte en attente
+      // ⚡ Solidaires : ouvrir modal sur la première alerte en attente et toast
       if (user.role === "solidaire") {
         const pending = sorted.find(a => a.status === "en attente");
         if (pending && (!currentAlert || pending.id !== currentAlert.id)) {
           setCurrentAlert(pending);
           setSelectedAlert(pending);
+          toast.info(`⚡ Nouvelle alerte de ${pending.ownerName || "Un sinistré"}`);
         }
       }
 
-      // 🔹 Pour le sinistré : vérifier s'il y a un paiement en attente
+      // 🔹 Sinistré : vérifier paiements en attente
       if (user.role === "sinistré") {
         for (const a of sorted) {
           if (a.reportId && (!paymentPending || paymentPending.id !== a.reportId)) {
@@ -100,25 +101,30 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
   return (
     <>
       {/* Modals */}
-      <AcceptModal
-        isOpen={!!currentAlert}
-        onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
-        alerte={currentAlert}
-      />
+      {user.role === "solidaire" && (
+        <AcceptModal
+          isOpen={!!currentAlert}
+          onClose={() => { setCurrentAlert(null); setSelectedAlert(null); }}
+          alerte={currentAlert}
+        />
+      )}
+
       <InProgressModal
         isOpen={!!currentReport}
         onClose={() => setCurrentReport(null)}
         report={currentReport}
-        solidaire={user}
+        solidaire={user.role === "solidaire" ? user : null}
         onComplete={() => setCurrentReport(null)}
         userPosition={userPosition}
       />
+
       {paymentPending && user.role === "sinistré" && (
         <PaymentBanner
           report={paymentPending}
           onConfirm={() => setPaymentPending(null)}
         />
       )}
+
       <HelpBanner
         report={currentReport || null}
         onComplete={() => setCurrentReport(null)}
@@ -133,13 +139,22 @@ export default function AlertsListener({ user, setSelectedAlert, userPosition, o
                 🚨 {a.ownerName || a.fromUid || "Inconnu"} : {a.nature || "Panne"}
               </h5>
               <div className="flex gap-2 mt-2">
-                <button className="px-2 py-1 bg-gray-200 rounded" onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}>
+                <button
+                  className="px-2 py-1 bg-gray-200 rounded"
+                  onClick={() => { setSelectedAlert(a); setCurrentAlert(a); }}
+                >
                   📍 Voir
                 </button>
-                <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={() => acceptAlert(a)}>
+                <button
+                  className="px-2 py-1 bg-green-600 text-white rounded"
+                  onClick={() => acceptAlert(a)}
+                >
                   ✅ Accepter
                 </button>
-                <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => rejectAlert(a)}>
+                <button
+                  className="px-2 py-1 bg-red-600 text-white rounded"
+                  onClick={() => rejectAlert(a)}
+                >
                   ❌ Refuser
                 </button>
               </div>
